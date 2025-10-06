@@ -9,6 +9,7 @@ import (
 	"text/tabwriter"
 
 	"tagTonic/mp3"
+	"tagTonic/tui"
 	"tagTonic/utils"
 
 	"github.com/sirupsen/logrus"
@@ -16,6 +17,7 @@ import (
 )
 
 var showJSON bool
+var showArtwork bool
 
 var showCmd = &cobra.Command{
 	Use:   "show [file]",
@@ -64,10 +66,24 @@ var showCmd = &cobra.Command{
 		fmt.Fprintf(tw, "Lyrics Length:\t%d chars\n", len(tags.Lyrics))
 		fmt.Fprintf(tw, "Artwork Size:\t%d bytes\n", len(tags.Artwork))
 		tw.Flush()
+
+		if showArtwork {
+			fmt.Println()
+			cache := tui.NewCache(10)
+			artworkRenderer := tui.NewArtworkRenderer(cache)
+			result := artworkRenderer.RenderArtwork(file)
+			
+			if result.Error != nil {
+				logrus.Warnf("Failed to display artwork: %v", result.Error)
+			} else {
+				fmt.Println(result.Content)
+			}
+		}
 	},
 }
 
 func init() {
 	rootCmd.AddCommand(showCmd)
 	showCmd.Flags().BoolVar(&showJSON, "json", false, "Output as JSON")
+	showCmd.Flags().BoolVar(&showArtwork, "artwork", false, "Display artwork in terminal (if supported)")
 }

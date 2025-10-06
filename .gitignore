@@ -63,3 +63,5 @@ test_*.mp3
 
 # Documentation build
 docs/_build/ 
+
+*.mp3
