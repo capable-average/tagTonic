@@ -2,7 +2,7 @@
 
 # tagTonic
 
-Lightweight MP3 tag editor & fetcher with a fast CLI and polished terminal UI (Go + Cobra + Bubble Tea).
+Lightweight MP3 tag editor & fetcher with a fast CLI and polished terminal UI (Go + Cobra + Bubble Tea) with image rendering support using kitty protocol ₍^. .^₎⟆
 
 </div>
 
@@ -23,7 +23,6 @@ go mod tidy
 go build -o tagTonic
 ./tagTonic tui   # launch UI
 ```
-
 Requires: Go 1.21+
 
 ## Quick Usage
@@ -42,6 +41,11 @@ tagTonic fetch song.mp3 --lyrics --artwork
 tagTonic batch --dir ./music --lyrics --artwork --recursive
 ```
 
+## Pics
+
+![No lyrics Demo Image](docs/demo_no_lyrics.png)
+![With Lyrics Demo Image](docs/demo_lyrics.png)
+
 ## Primary Commands
 
 | Command | Purpose | Common Flags |
@@ -50,10 +54,3 @@ tagTonic batch --dir ./music --lyrics --artwork --recursive
 | `edit`  | Set or replace tags | `--title --artist --album --genre --year --lyrics --artwork` |
 | `fetch` | Pull lyrics/artwork from APIs | `--lyrics --artwork --force` |
 | `batch` | Apply fetch/edit over many files | `--dir --pattern --lyrics --artwork --recursive` |
-
-## Contributing
-
-Issues & PRs welcome:
-1. Fork & branch
-2. Make changes + tests
-3. Open PR with concise summary

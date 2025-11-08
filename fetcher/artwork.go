@@ -1,6 +1,7 @@
 package fetcher
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -29,17 +30,52 @@ func (af *artworkFetcher) Fetch(title, artist, album string) ([]byte, error) {
 	if title == "" && artist == "" && album == "" {
 		return nil, fmt.Errorf("at least one of title, artist, or album is required")
 	}
+	
 	sources := []func(string, string, string) ([]byte, error){
 		af.fetchFromDeezer,
 		af.fetchFromITunes,
 		af.fetchFromMusicBrainz,
 	}
-	for _, src := range sources {
-		if art, err := src(title, artist, album); err == nil && len(art) > 0 {
-			return art, nil
+	
+	if artwork := af.fetchConcurrently(title, artist, album, sources); len(artwork) > 0 {
+		return artwork, nil
+	}
+	
+	return nil, fmt.Errorf("failed to fetch artwork from free sources")
+}
+
+func (af *artworkFetcher) fetchConcurrently(title, artist, album string, sources []func(string, string, string) ([]byte, error)) []byte {
+	type result struct {
+		artwork []byte
+		err     error
+	}
+
+	results := make(chan result, len(sources))
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	for _, source := range sources {
+		go func(src func(string, string, string) ([]byte, error)) {
+			artwork, err := src(title, artist, album)
+			select {
+			case results <- result{artwork: artwork, err: err}:
+			case <-ctx.Done():
+			}
+		}(source)
+	}
+
+	for i := 0; i < len(sources); i++ {
+		select {
+		case res := <-results:
+			if res.err == nil && len(res.artwork) > 0 {
+				return res.artwork
+			}
+		case <-ctx.Done():
+			return nil
 		}
 	}
-	return nil, fmt.Errorf("failed to fetch artwork from free sources")
+
+	return nil
 }
 
 func (af *artworkFetcher) fetchFromMusicBrainz(title, artist, album string) ([]byte, error) {

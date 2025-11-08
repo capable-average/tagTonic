@@ -20,8 +20,6 @@ type Config struct {
 	EnableLogging    bool   `mapstructure:"enable_logging"`
 	LogLevel         string `mapstructure:"log_level"`
 
-	Theme           string `mapstructure:"theme"`
-	EnableAnimations bool   `mapstructure:"enable_animations"`
 	ShowFileSize    bool   `mapstructure:"show_file_size"`
 
 	PreferredLyricsSource  string `mapstructure:"preferred_lyrics_source"`
@@ -39,8 +37,6 @@ func DefaultConfig() *Config {
 		MaxFileSize:            100 * 1024 * 1024, // 100MB
 		EnableLogging:          true,
 		LogLevel:               "info",
-		Theme:                  "purple",
-		EnableAnimations:       true,
 		ShowFileSize:           true,
 		PreferredLyricsSource:  "lyrics.ovh",
 		PreferredArtworkSource: "itunes",
@@ -97,8 +93,6 @@ func SaveConfig(config *Config) error {
 	viper.Set("max_file_size", config.MaxFileSize)
 	viper.Set("enable_logging", config.EnableLogging)
 	viper.Set("log_level", config.LogLevel)
-	viper.Set("theme", config.Theme)
-	viper.Set("enable_animations", config.EnableAnimations)
 	viper.Set("show_file_size", config.ShowFileSize)
 	viper.Set("preferred_lyrics_source", config.PreferredLyricsSource)
 	viper.Set("preferred_artwork_source", config.PreferredArtworkSource)
@@ -134,18 +128,6 @@ func ValidateConfig(config *Config) error {
 	}
 	if !found {
 		return fmt.Errorf("invalid log level: %s", config.LogLevel)
-	}
-
-	validThemes := []string{"purple", "blue", "green", "red"}
-	found = false
-	for _, theme := range validThemes {
-		if config.Theme == theme {
-			found = true
-			break
-		}
-	}
-	if !found {
-		return fmt.Errorf("invalid theme: %s", config.Theme)
 	}
 
 	validLyricsSources := []string{"lyrics.ovh", "genius", "musixmatch"}
