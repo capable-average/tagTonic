@@ -17,7 +17,8 @@ type LyricsFetcher interface {
 }
 
 type lyricsFetcher struct {
-	client *http.Client
+	client        *http.Client
+	geniusAPIKey  string
 }
 
 func NewLyricsFetcher() LyricsFetcher {
@@ -25,6 +26,16 @@ func NewLyricsFetcher() LyricsFetcher {
 		client: &http.Client{
 			Timeout: 15 * time.Second,
 		},
+		geniusAPIKey: "",
+	}
+}
+
+func NewLyricsFetcherWithConfig(geniusAPIKey string) LyricsFetcher {
+	return &lyricsFetcher{
+		client: &http.Client{
+			Timeout: 15 * time.Second,
+		},
+		geniusAPIKey: geniusAPIKey,
 	}
 }
 
@@ -65,20 +76,24 @@ func (lf *lyricsFetcher) fetchConcurrently(title, artist string, sources []func(
 	type result struct {
 		lyrics string
 		err    error
+		source string
 	}
 
 	results := make(chan result, len(sources))
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	for _, source := range sources {
-		go func(src func(string, string) (string, error)) {
+	sourceNames := []string{"Genius", "AZLyrics", "Lyrics.ovh", "ChartLyrics"}
+	
+	for i, source := range sources {
+		sourceName := sourceNames[i]
+		go func(src func(string, string) (string, error), name string) {
 			lyrics, err := src(title, artist)
 			select {
-			case results <- result{lyrics: lyrics, err: err}:
+			case results <- result{lyrics: lyrics, err: err, source: name}:
 			case <-ctx.Done():
 			}
-		}(source)
+		}(source, sourceName)
 	}
 
 	for i := 0; i < len(sources); i++ {
@@ -189,6 +204,10 @@ func (lf *lyricsFetcher) fetchFromGenius(title, artist string) (string, error) {
 	
 	req.Header.Set("User-Agent", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36")
 	
+	if lf.geniusAPIKey != "" {
+		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", lf.geniusAPIKey))
+	}
+	
 	resp, err := lf.client.Do(req)
 	if err != nil {
 		return "", err
@@ -205,6 +224,10 @@ func (lf *lyricsFetcher) fetchFromGenius(title, artist string) (string, error) {
 	}
 	
 	var searchResp struct {
+		Meta struct {
+			Status  int    `json:"status"`
+			Message string `json:"message"`
+		} `json:"meta"`
 		Response struct {
 			Hits []struct {
 				Result struct {
@@ -221,6 +244,12 @@ func (lf *lyricsFetcher) fetchFromGenius(title, artist string) (string, error) {
 	
 	if err := json.Unmarshal(body, &searchResp); err != nil {
 		return "", fmt.Errorf("failed to parse genius search response: %w", err)
+	}
+	if searchResp.Meta.Status != 200 {
+		if searchResp.Meta.Message != "" {
+			return "", fmt.Errorf("genius API error: %s (status: %d)", searchResp.Meta.Message, searchResp.Meta.Status)
+		}
+		return "", fmt.Errorf("genius API returned status: %d", searchResp.Meta.Status)
 	}
 	
 	if len(searchResp.Response.Hits) == 0 {
@@ -352,9 +381,16 @@ func (lf *lyricsFetcher) scrapeGeniusLyrics(geniusURL string) (string, error) {
 }
 
 func (lf *lyricsFetcher) cleanHTMLLyrics(html string) string {
-	re := regexp.MustCompile(`<[^>]*>`)
-	text := re.ReplaceAllString(html, "")
+	// First, convert <br> tags to newlines BEFORE stripping HTML
+	html = regexp.MustCompile(`(?i)<br\s*/?\s*>`).ReplaceAllString(html, "\n")
 	
+	// Convert common block-level elements to newlines
+	html = regexp.MustCompile(`(?i)</?(div|p)[^>]*>`).ReplaceAllString(html, "\n")
+	
+	// Strip remaining HTML tags
+	html = regexp.MustCompile(`<[^>]*>`).ReplaceAllString(html, "")
+	
+	// Decode HTML entities
 	replacements := map[string]string{
 		"&amp;":    "&",
 		"&lt;":     "<",
@@ -363,22 +399,38 @@ func (lf *lyricsFetcher) cleanHTMLLyrics(html string) string {
 		"&#x27;":   "'",
 		"&#39;":    "'",
 		"&nbsp;":   " ",
-		"<br>":     "\n",
-		"<br/>":    "\n",
-		"<br />":   "\n",
+		"&#8217;":  "'",
+		"&#8220;":  "\"",
+		"&#8221;":  "\"",
 	}
 	
 	for entity, replacement := range replacements {
-		text = strings.ReplaceAll(text, entity, replacement)
+		html = strings.ReplaceAll(html, entity, replacement)
 	}
 	
-	lines := strings.Split(text, "\n")
+	// Split into lines and clean
+	lines := strings.Split(html, "\n")
 	var cleanLines []string
+	
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
-		if line != "" {
-			cleanLines = append(cleanLines, line)
+		
+		// Skip empty lines
+		if line == "" {
+			continue
 		}
+		
+		// Skip contributor/metadata lines (like "68 ContributorsTranslations")
+		if regexp.MustCompile(`^\d+\s*(Contributor|Translation|Embed|Share)`).MatchString(line) {
+			continue
+		}
+		
+		// Skip lines that are just numbers followed by "Contributors"
+		if regexp.MustCompile(`^\d+\s*Contributors?$`).MatchString(line) {
+			continue
+		}
+		
+		cleanLines = append(cleanLines, line)
 	}
 	
 	return strings.Join(cleanLines, "\n")
@@ -414,20 +466,23 @@ func (lf *lyricsFetcher) fetchFromAZLyrics(title, artist string) (string, error)
 	
 	html := string(body)
 	
-	startMarker := `<!-- Usage of azlyrics.com content -->`
+	startMarker := `<!-- Usage of azlyrics.com content by any third-party lyrics provider is prohibited by our licensing agreement. Sorry about that. -->`
 	
 	startIdx := strings.Index(html, startMarker)
 	if startIdx == -1 {
-		return "", fmt.Errorf("could not find lyrics start marker")
+		startMarker = `<!-- Usage of azlyrics.com content`
+		startIdx = strings.Index(html, startMarker)
+		if startIdx == -1 {
+			return "", fmt.Errorf("could not find lyrics start marker")
+		}
 	}
 	
-	searchStart := startIdx + len(startMarker)
-	divStart := strings.Index(html[searchStart:], "<div>")
-	if divStart == -1 {
-		return "", fmt.Errorf("could not find lyrics div")
+	commentEnd := strings.Index(html[startIdx:], "-->")
+	if commentEnd == -1 {
+		return "", fmt.Errorf("could not find comment end")
 	}
 	
-	lyricsStart := searchStart + divStart + 5
+	lyricsStart := startIdx + commentEnd + 3
 	
 	divEnd := strings.Index(html[lyricsStart:], "</div>")
 	if divEnd == -1 {
@@ -580,8 +635,10 @@ func (lf *lyricsFetcher) fetchFromChartLyrics(title, artist string) (string, err
 	}
 	
 	xml := string(data)
-	start := strings.Index(strings.ToLower(xml), "<lyric>")
-	end := strings.Index(strings.ToLower(xml), "</lyric>")
+	
+	xmlLower := strings.ToLower(xml)
+	start := strings.Index(xmlLower, "<lyric>")
+	end := strings.Index(xmlLower, "</lyric>")
 	if start == -1 || end == -1 || end <= start+7 {
 		return "", fmt.Errorf("no lyrics tag")
 	}
@@ -592,7 +649,18 @@ func (lf *lyricsFetcher) fetchFromChartLyrics(title, artist string) (string, err
 		return "", fmt.Errorf("empty lyric")
 	}
 	
-	replacer := strings.NewReplacer("&quot;", "\"", "&amp;", "&")
+	replacer := strings.NewReplacer(
+		"&quot;", "\"", 
+		"&amp;", "&",
+		"&apos;", "'",
+		"&lt;", "<",
+		"&gt;", ">",
+	)
 	lyric = replacer.Replace(lyric)
+	
+	lyric = regexp.MustCompile(`([.!?])\s+([A-Z])`).ReplaceAllString(lyric, "$1\n$2")
+	
+	lyric = regexp.MustCompile(`\s+(You better|The |His |He's |I |But |So |And |'Cuz|No more)`).ReplaceAllString(lyric, "\n$1")
+	
 	return lyric, nil
 }

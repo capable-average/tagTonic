@@ -55,10 +55,14 @@ func LoadConfig() (*Config, error) {
 		return nil, fmt.Errorf("failed to find home directory: %w", err)
 	}
 
+	configDir := filepath.Join(home, ".config", "tagTonic")
+	viper.AddConfigPath(configDir)
 	viper.AddConfigPath(home)
 	viper.AddConfigPath(".")
-	viper.SetConfigName(".tagTonic")
+	viper.SetConfigName("config")
 	viper.SetConfigType("yaml")
+
+	viper.SetConfigName("config")
 
 	viper.AutomaticEnv()
 
@@ -77,7 +81,7 @@ func SaveConfig(config *Config) error {
 		return fmt.Errorf("failed to find home directory: %w", err)
 	}
 
-	configDir := filepath.Join(home, ".tagTonic")
+	configDir := filepath.Join(home, ".config", "tagTonic")
 	if err := os.MkdirAll(configDir, 0755); err != nil {
 		return fmt.Errorf("failed to create config directory: %w", err)
 	}
@@ -109,7 +113,7 @@ func GetConfigPath() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(home, ".tagTonic", "config.yaml"), nil
+	return filepath.Join(home, ".config", "tagTonic", "config.yaml"), nil
 }
 
 func CreateDefaultConfig() error {

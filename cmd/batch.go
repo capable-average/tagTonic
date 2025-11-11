@@ -7,6 +7,7 @@ import (
 	"strings"
 	"sync"
 
+	"tagTonic/config"
 	"tagTonic/fetcher"
 	"tagTonic/mp3"
 	"tagTonic/utils"
@@ -181,6 +182,12 @@ func processBatchConcurrently(files []string, numWorkers int, bar *progressbar.P
 		numWorkers = 20
 	}
 
+	cfg, err := config.LoadConfig()
+	if err != nil {
+		logrus.Debugf("Failed to load config, using defaults: %v", err)
+		cfg = config.DefaultConfig()
+	}
+
 	stats := &BatchStats{}
 	jobs := make(chan FileJob, len(files))
 	results := make(chan FileResult, len(files))
@@ -191,7 +198,7 @@ func processBatchConcurrently(files []string, numWorkers int, bar *progressbar.P
 	var wg sync.WaitGroup
 	for i := 0; i < numWorkers; i++ {
 		wg.Add(1)
-		go worker(ctx, jobs, results, &wg)
+		go worker(ctx, jobs, results, &wg, cfg)
 	}
 
 	go func() {
@@ -244,11 +251,18 @@ func processBatchConcurrently(files []string, numWorkers int, bar *progressbar.P
 	return stats
 }
 
-func worker(ctx context.Context, jobs <-chan FileJob, results chan<- FileResult, wg *sync.WaitGroup) {
+func worker(ctx context.Context, jobs <-chan FileJob, results chan<- FileResult, wg *sync.WaitGroup, cfg *config.Config) {
 	defer wg.Done()
 
 	editor := mp3.NewTagEditor()
-	lyricsFetcher := fetcher.NewLyricsFetcher()
+	
+	var lyricsFetcher fetcher.LyricsFetcher
+	if cfg.GeniusAPIKey != "" {
+		lyricsFetcher = fetcher.NewLyricsFetcherWithConfig(cfg.GeniusAPIKey)
+	} else {
+		lyricsFetcher = fetcher.NewLyricsFetcher()
+	}
+	
 	artworkFetcher := fetcher.NewArtworkFetcher()
 
 	for job := range jobs {

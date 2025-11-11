@@ -4,6 +4,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"tagTonic/config"
 	"tagTonic/fetcher"
 	"tagTonic/mp3"
 	"tagTonic/utils"
@@ -37,8 +38,23 @@ Examples:
 			logrus.Fatal(err)
 		}
 
+		cfg, err := config.LoadConfig()
+		if err != nil {
+			logrus.Debugf("Failed to load config, using defaults: %v", err)
+			cfg = config.DefaultConfig()
+		}
+
 		editor := mp3.NewTagEditor()
-		lyricsFetcher := fetcher.NewLyricsFetcher()
+		
+		var lyricsFetcher fetcher.LyricsFetcher
+		if cfg.GeniusAPIKey != "" {
+			lyricsFetcher = fetcher.NewLyricsFetcherWithConfig(cfg.GeniusAPIKey)
+			logrus.Debug("Using Genius API with authentication")
+		} else {
+			lyricsFetcher = fetcher.NewLyricsFetcher()
+			logrus.Debug("Using Genius API without authentication (limited access)")
+		}
+		
 		artworkFetcher := fetcher.NewArtworkFetcher()
 
 		tags, err := editor.ReadTags(filePath)
