@@ -1,0 +1,40 @@
+# tagTonic Configuration File Example
+# Copy this file to ~/.tagTonic/config.yaml and fill in your API keys
+
+genius_api_key: ""
+# for future
+musixmatch_api_key: ""
+lastfm_api_key: ""
+discogs_token: ""
+
+# Default directory to browse in TUI
+default_directory: "."
+
+# Maximum file size to process (in bytes)
+max_file_size: 104857600
+
+# Show file size in TUI file browser
+show_file_size: true
+
+# Options: "genius", "azlyrics", "lyrics.ovh", "chartlyrics"
+preferred_lyrics_source: "lyrics.ovh"
+
+# Options: "itunes", "musicbrainz", "discogs", "lastfm"
+preferred_artwork_source: "itunes"
+
+# Maximum artwork dimensions (width/height in pixels)
+max_artwork_size: 500
+enable_image_resize: true
+
+# Number of concurrent workers for batch operations
+# Default: 5 (min: 1, max: 20)
+batch_concurrency: 5
+
+# Timeout for batch operations (in seconds)
+batch_timeout: 30
+
+# Enable logging
+enable_logging: true
+
+# Log level: "debug", "info", "warn", "error"
+log_level: "info"
