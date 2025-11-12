@@ -26,7 +26,7 @@ var showCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		file := args[0]
-		if err := validateMP3File(file); err != nil {
+		if err := utils.ValidateMP3File(file); err != nil {
 			logrus.Fatal(err)
 		}
 		editor := mp3.NewTagEditor()

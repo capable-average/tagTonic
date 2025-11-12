@@ -1,10 +1,9 @@
 package main
 
 import (
-	"os"
+	"tagTonic/cmd"
 
 	"github.com/sirupsen/logrus"
-	"tagTonic/cmd"
 )
 
 func main() {
@@ -14,6 +13,5 @@ func main() {
 
 	if err := cmd.Execute(); err != nil {
 		logrus.Fatal(err)
-		os.Exit(1)
 	}
 }

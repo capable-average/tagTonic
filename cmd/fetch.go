@@ -34,7 +34,7 @@ Examples:
 	Run: func(cmd *cobra.Command, args []string) {
 		filePath := args[0]
 
-		if err := validateMP3File(filePath); err != nil {
+		if err := utils.ValidateMP3File(filePath); err != nil {
 			logrus.Fatal(err)
 		}
 
