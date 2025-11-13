@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -119,7 +120,147 @@ func (a *App) renderMainView(layout AdaptiveLayout) string {
 }
 
 func (a *App) renderFileBrowser(width, height int) string {
-	return ""
+	theme := a.theme
+	entries := a.fileBrowser.GetFilteredEntries()
+	selectedIndex := a.fileBrowser.GetSelectedIndex()
+
+	var lines []string
+
+	header := IconFolder + " Files"
+	if a.fileBrowser.IsBatchMode() {
+		header += " " + StatusBadge("BATCH", "info", theme)
+	}
+
+	headerStyle := theme.HeaderStyle.Copy().Width(width - 4)
+	headerLine := headerStyle.Render(header)
+	lines = append(lines, headerLine)
+
+	currentPath := a.fileBrowser.GetCurrentDir()
+	maxPathLen := width - 8
+	if len(currentPath) > maxPathLen {
+		currentPath = "..." + currentPath[len(currentPath)-(maxPathLen-3):]
+	}
+	breadcrumb := theme.MutedTextStyle.Render("📍 " + currentPath)
+	lines = append(lines, breadcrumb)
+
+	sepWidth := width - 6
+	if sepWidth < 1 {
+		sepWidth = 1
+	}
+	lines = append(lines, Separator(sepWidth, "─", ColorBorderLight))
+
+	contentHeight := height - 6
+	if contentHeight < 1 {
+		contentHeight = 1
+	}
+
+	startIdx := 0
+	if selectedIndex >= contentHeight {
+		startIdx = selectedIndex - contentHeight + 1
+	}
+	endIdx := startIdx + contentHeight
+	if endIdx > len(entries) {
+		endIdx = len(entries)
+	}
+
+	for i := startIdx; i < endIdx; i++ {
+		entry := entries[i]
+
+		var lineContent string
+
+		if i == selectedIndex {
+			lineContent = IconArrowRight + " "
+		} else {
+			lineContent = "  "
+		}
+
+		if a.fileBrowser.IsBatchMode() {
+			if a.fileBrowser.IsSelected(entry.Path) {
+				lineContent += theme.SuccessStyle.Render("[✓] ")
+			} else {
+				lineContent += theme.MutedTextStyle.Render("[ ] ")
+			}
+		}
+
+		icon := IconFile
+		if entry.IsDir {
+			icon = IconFolder
+		} else if strings.HasSuffix(entry.Name, ".mp3") {
+			icon = IconMusic
+		}
+		lineContent += icon + " "
+
+		name := entry.Name
+		maxNameLen := width - 25
+		if maxNameLen < 10 {
+			maxNameLen = 10
+		}
+
+		if entry.IsDir {
+			displayName := name + "/"
+			if len(displayName) > maxNameLen {
+				displayName = displayName[:maxNameLen-3] + "..."
+			}
+			name = theme.HighlightStyle.Render(displayName)
+		} else {
+			displayName := name
+			if len(displayName) > maxNameLen {
+				displayName = displayName[:maxNameLen-3] + "..."
+			}
+			name = theme.NormalTextStyle.Render(displayName)
+		}
+
+		lineContent += name
+
+		if !entry.IsDir && entry.Size > 0 {
+			sizeStr := formatFileSize(entry.Size)
+			lineContent += " " + theme.MutedTextStyle.Render(sizeStr)
+		}
+
+		if i == selectedIndex {
+			lineContent = theme.SelectedItemStyle.Render(lineContent)
+		}
+
+		lines = append(lines, lineContent)
+	}
+
+	var footerLine string
+	if len(entries) > 0 {
+		footer := fmt.Sprintf("%d/%d files", selectedIndex+1, len(entries))
+		if len(entries) > contentHeight {
+			scrollPercent := float64(selectedIndex) / float64(len(entries)-1) * 100
+			footer += fmt.Sprintf(" │ %d%%", int(scrollPercent))
+		}
+		footerLine = theme.MutedTextStyle.Render(footer)
+	} else {
+		footerLine = theme.MutedTextStyle.Render("No files")
+	}
+
+	emptyLinesNeeded := contentHeight - (endIdx - startIdx) - 1
+	if emptyLinesNeeded < 0 {
+		emptyLinesNeeded = 0
+	}
+	for i := 0; i < emptyLinesNeeded; i++ {
+		lines = append(lines, "")
+	}
+
+	lines = append(lines, footerLine)
+
+	content := strings.Join(lines, "\n")
+
+	borderStyle := lipgloss.NewStyle().
+		Border(theme.PanelBorder).
+		Width(width-2).
+		Height(height-2).
+		Padding(0, 1)
+
+	if a.currentMode == FileBrowserMode {
+		borderStyle = borderStyle.BorderForeground(ColorPrimary)
+	} else {
+		borderStyle = borderStyle.BorderForeground(ColorBorder)
+	}
+
+	return borderStyle.Render(content)
 }
 
 func (a *App) renderMiddlePanel(width, height, tagHeight int) string {

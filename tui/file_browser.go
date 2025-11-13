@@ -10,8 +10,11 @@ import (
 type FileBrowser struct {
 	currentDir      string
 	entries         []FileEntry
+	filteredEntries []FileEntry
 	selectedIndex   int
+	selectedFiles   map[string]bool
 	showHidden      bool
+	batchMode       bool
 }
 
 type FileEntry struct {
@@ -146,6 +149,10 @@ func (fb *FileBrowser) GetCurrentDir() string {
 	return fb.currentDir
 }
 
+func (fb *FileBrowser) GetFilteredEntries() []FileEntry {
+	return fb.filteredEntries
+}
+
 func (fb *FileBrowser) GetSelectedIndex() int {
 	return fb.selectedIndex
 }
@@ -157,4 +164,8 @@ func (fb *FileBrowser) ToggleHidden() {
 
 func (fb *FileBrowser) IsSelected(path string) bool {
 	return fb.selectedFiles[path]
+}
+
+func (fb *FileBrowser) IsBatchMode() bool {
+	return fb.batchMode
 }
