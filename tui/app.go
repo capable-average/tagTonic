@@ -15,15 +15,18 @@ import (
 
 type App struct {
 	fileBrowser  *FileBrowser
+	tagEditor    *TagEditor
+	layout         *Layout
+	
 	currentMode    Mode
 	previousMode   Mode
-	layout         *Layout
+	currentFile    *FileEntry
+	lyricsHasFocus bool
 
 	statusMessage string
 	statusTimeout int
-	isLoading     bool
-	lyricsHasFocus bool
 	theme         *Theme
+	isLoading     bool
 
 	config *config.Config
 }
@@ -264,6 +267,122 @@ func (a *App) renderFileBrowser(width, height int) string {
 }
 
 func (a *App) renderMiddlePanel(width, height, tagHeight int) string {
+	if a.currentFile == nil {
+		var lines []string
+		lines = append(lines, "No file selected")
+
+		contentHeight := height - 2
+		for len(lines) < contentHeight {
+			lines = append(lines, "")
+		}
+
+		emptyStyle := lipgloss.NewStyle().
+			Border(a.theme.PanelBorder).
+			BorderForeground(ColorBorder).
+			Width(width-2).
+			Padding(0, 1)
+		return emptyStyle.Render(strings.Join(lines, "\n"))
+	}
+
+	lyricsHeight := height - tagHeight
+
+	tagsPanel := a.renderTagsPanel(width, tagHeight)
+
+	lyricsPanel := a.renderLyricsPanel(width, lyricsHeight)
+
+	return lipgloss.JoinVertical(lipgloss.Left, tagsPanel, lyricsPanel)
+}
+
+func (a *App) renderTagsPanel(width, height int) string {
+	theme := a.theme
+	var lines []string
+
+	header := IconMusic + " Tags"
+	if a.tagEditor.IsDirty() {
+		header += " " + StatusBadge("MODIFIED", "warning", theme)
+	}
+
+	headerLine := theme.HeaderStyle.Render(header)
+	lines = append(lines, headerLine)
+
+	sepWidth := max(width-6, 1)
+	lines = append(lines, Separator(sepWidth, "─", ColorBorderLight))
+
+	fields := a.tagEditor.GetFields()
+	editingField := a.tagEditor.GetEditingField()
+
+	for i, field := range fields {
+		var lineContent string
+		if i == editingField && a.currentMode == TagEditMode {
+			lineContent = IconArrowRight + " "
+		} else {
+			lineContent = "  "
+		}
+
+		label := theme.MutedTextStyle.Render(field.Name + ":")
+		lineContent += label + " "
+
+		value := field.Value
+		if a.tagEditor.IsEditing() && i == editingField {
+			value = a.tagEditor.GetEditBuffer() + theme.EditingStyle.Render("_")
+		} else if value == "" {
+			value = theme.MutedTextStyle.Render("(empty)")
+		} else {
+			maxValueLen := width - 20
+			if len(value) > maxValueLen {
+				value = value[:maxValueLen-3] + theme.MutedTextStyle.Render("...")
+			}
+			value = theme.FieldValueStyle.Render(value)
+		}
+
+		lineContent += value
+
+		if a.tagEditor.IsEditing() && i == editingField {
+			lineContent = theme.EditingStyle.Render(lineContent)
+		}
+
+		lines = append(lines, lineContent)
+
+		if err := a.tagEditor.GetValidationError(field.Name); err != "" {
+			errorLine := "  " + theme.ErrorStyle.Render(IconCross+" "+err)
+			lines = append(lines, errorLine)
+		}
+	}
+
+	var hints []string
+	if a.tagEditor.IsDirty() {
+		hints = append(hints, theme.SuccessStyle.Render("s:save"))
+	}
+	hints = append(hints, theme.MutedTextStyle.Render("e:edit"))
+	hints = append(hints, theme.MutedTextStyle.Render("f:fetch"))
+
+	footer := strings.Join(hints, theme.MutedTextStyle.Render(" │ "))
+	footerLine := theme.MutedTextStyle.Render(footer)
+
+	contentHeight := height - 2
+	for len(lines) < contentHeight-1 {
+		lines = append(lines, "")
+	}
+
+	lines = append(lines, footerLine)
+
+	content := strings.Join(lines, "\n")
+
+	borderStyle := lipgloss.NewStyle().
+		Border(theme.PanelBorder).
+		Width(width-2).
+		Padding(0, 1)
+
+	if a.currentMode == TagEditMode && !a.lyricsHasFocus {
+		borderStyle = borderStyle.BorderForeground(ColorPrimary)
+	} else {
+		borderStyle = borderStyle.BorderForeground(ColorBorder)
+	}
+
+	return borderStyle.Render(content)
+}
+
+func (a *App) renderLyricsPanel(width, tagHeight int) string {
 	return ""
 }
 
