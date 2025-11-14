@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/charmbracelet/lipgloss"
 )
@@ -150,6 +151,45 @@ func BorderedBox(content string, width, height int, style lipgloss.Style) string
 		Width(width).
 		Height(height).
 		Render(content)
+}
+
+func TitledBox(title, content string, width, height int, theme *Theme) string {
+	titleBar := theme.HeaderStyle.Width(width - 4).Render(title)
+
+	sepWidth := width - 4
+	if sepWidth < 1 {
+		sepWidth = 1
+	}
+	separator := Separator(sepWidth, "─", ColorBorderLight)
+
+	contentAreaHeight := max(height-4, 1)
+
+	contentLines := strings.Split(content, "\n")
+
+	if len(contentLines) < contentAreaHeight {
+		for len(contentLines) < contentAreaHeight {
+			contentLines = append(contentLines, "")
+		}
+	} else if len(contentLines) > contentAreaHeight {
+		contentLines = contentLines[:contentAreaHeight]
+	}
+
+	paddedContent := strings.Join(contentLines, "\n")
+
+	boxContent := lipgloss.JoinVertical(
+		lipgloss.Left,
+		titleBar,
+		separator,
+		paddedContent,
+	)
+
+	boxStyle := lipgloss.NewStyle().
+		Border(theme.PanelBorder).
+		BorderForeground(theme.PanelBorderColor).
+		Width(width-2).
+		Padding(0, 1)
+
+	return boxStyle.Render(boxContent)
 }
 
 func SuccessText(text string, theme *Theme) string {

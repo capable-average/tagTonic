@@ -257,25 +257,6 @@ func (te *TagEditor) UpdateArtwork(artwork []byte) {
 	te.isDirty = true
 }
 
-func (te *TagEditor) copyTags(tags *mp3.MP3Tags) *mp3.MP3Tags {
-	if tags == nil {
-		return nil
-	}
-
-	artwork := make([]byte, len(tags.Artwork))
-	copy(artwork, tags.Artwork)
-
-	return &mp3.MP3Tags{
-		Title:   tags.Title,
-		Artist:  tags.Artist,
-		Album:   tags.Album,
-		Genre:   tags.Genre,
-		Year:    tags.Year,
-		Lyrics:  tags.Lyrics,
-		Artwork: artwork,
-	}
-}
-
 func (te *TagEditor) validateTitle(value string) error {
 	if len(value) > 200 {
 		return fmt.Errorf("title too long (max 200 characters)")

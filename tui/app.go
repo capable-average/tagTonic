@@ -16,6 +16,7 @@ import (
 type App struct {
 	fileBrowser  *FileBrowser
 	tagEditor    *TagEditor
+	mediaManager *MediaManager
 	layout         *Layout
 	
 	currentMode    Mode
@@ -382,8 +383,58 @@ func (a *App) renderTagsPanel(width, height int) string {
 	return borderStyle.Render(content)
 }
 
-func (a *App) renderLyricsPanel(width, tagHeight int) string {
-	return ""
+func (a *App) renderLyricsPanel(width, height int) string {
+	theme := a.theme
+
+	lyricsHeight := height
+
+	lyricsPanel := a.mediaManager.GetLyricsPanel()
+	var lyricsContent string
+	var lyricsHeader string
+
+	if lyricsPanel.HasLyrics() {
+		scrollIndicator := ""
+		availableContentHeight := lyricsHeight - 4
+		lyricsHeader = IconMusic + " Lyrics" + scrollIndicator
+
+		visibleLines := lyricsPanel.GetVisibleLines(availableContentHeight)
+		var styledLines []string
+
+		maxLineWidth := width - 10
+		if maxLineWidth < 10 {
+			maxLineWidth = 10
+		}
+
+		for _, line := range visibleLines {
+			displayLine := sanitizeLyricsLine(line)
+
+			runes := []rune(displayLine)
+			if len(runes) > maxLineWidth {
+				displayLine = string(runes[:maxLineWidth-3]) + "..."
+			}
+
+			if strings.HasPrefix(strings.TrimSpace(displayLine), "[") && strings.Contains(displayLine, "]") {
+				displayLine = theme.HighlightStyle.Render(displayLine)
+			} else {
+				displayLine = theme.NormalTextStyle.Render(displayLine)
+			}
+
+			styledLines = append(styledLines, "  "+displayLine)
+		}
+
+		lyricsContent = strings.Join(styledLines, "\n")
+	} else {
+		lyricsHeader = IconMusic + " Lyrics"
+		lyricsContent = theme.MutedTextStyle.Render("\n  No lyrics available\n  Press 'f' to fetch")
+	}
+
+	if a.lyricsHasFocus {
+		lyricsHeader += " " + StatusBadge("FOCUSED", "info", theme)
+	}
+
+	lyricsBox := TitledBox(lyricsHeader, lyricsContent, width, lyricsHeight, theme)
+
+	return lyricsBox
 }
 
 func (a *App) renderStatusBar() string {
@@ -532,6 +583,28 @@ func (a *App) renderHelp() string {
 ╚══════════════════════════════════════════════════════════════╝
 
 Press any key to return...`
+}
+
+func sanitizeLyricsLine(line string) string {
+	// Remove null bytes
+	line = strings.ReplaceAll(line, "\x00", "\n")
+	line = strings.ReplaceAll(line, "\r", "\n")
+
+	var result strings.Builder
+	result.Grow(len(line))
+
+	for _, r := range line {
+		// Filter control chars (0x00-0x1F except tab) and DEL (0x7F)
+		if r == '\t' || (r >= 0x20 && r != 0x7F) {
+			result.WriteRune(r)
+		} else if r < 0x20 || r == 0x7F {
+			continue
+		} else {
+			result.WriteRune(r)
+		}
+	}
+
+	return result.String()
 }
 
 func initLogging() error {
