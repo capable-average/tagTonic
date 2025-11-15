@@ -235,6 +235,9 @@ func (a *App) renderFileBrowser(width, height int) string {
 	var lines []string
 
 	header := IconFolder + " Files"
+	if a.fileBrowser.IsSearchMode() {
+		header = IconSearch + " Search: " + theme.HighlightStyle.Render(a.fileBrowser.GetSearchQuery())
+	}
 	if a.fileBrowser.IsBatchMode() {
 		header += " " + StatusBadge("BATCH", "info", theme)
 	}
