@@ -35,7 +35,12 @@ type App struct {
 func NewApp(startDir string) *App {
 
 	return &App{
+		fileBrowser:  NewFileBrowser(startDir),
+		tagEditor:    NewTagEditor(),
+		mediaManager: NewMediaManager(),
+		layout:       NewLayout(),
 		currentMode:  FileBrowserMode,
+		theme:        DefaultTheme(),
 		isLoading:    false,
 	}
 }
@@ -48,22 +53,121 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
 
 	switch msg := msg.(type) {
-		case tea.WindowSizeMsg:
-			a.layout.Update(msg.Width, msg.Height)
-			return a, tea.Batch(cmds...)
+	case tea.WindowSizeMsg:
+		a.layout.Update(msg.Width, msg.Height)
+		layout := a.layout.Calculate()
 
-		case tea.KeyMsg:
-			cmd := a.handleKeyPress(msg.String())
-			if cmd != nil {
+		clearKittyImages()
+
+		xPos := layout.LeftPanelWidth + layout.MiddlePanelWidth + 3
+		yPos := 4
+
+		if layout.ShowArtwork {
+			if cmd := a.mediaManager.HandleWindowResizeWithPosition(layout.ArtworkMaxWidth, layout.ArtworkMaxHeight, xPos, yPos); cmd != nil {
+				cmds = append(cmds, cmd)
+			}
+		}
+
+		return a, tea.Batch(cmds...)
+
+	case tea.KeyMsg:
+		cmd := a.handleKeyPress(msg.String())
+		if cmd != nil {
+			cmds = append(cmds, cmd)
+		}
+
+	case ArtworkRenderMsg:
+		a.mediaManager.UpdateArtworkResult(msg.Result)
+		if msg.Result.Error != nil {
+			a.setError("Artwork rendering failed", msg.Result.Error.Error())
+		}
+
+	case FileLoadedMsg:
+		a.tagEditor.LoadTags(msg.Tags)
+		a.isLoading = false
+
+		layout := a.layout.Calculate()
+		xPos := layout.LeftPanelWidth + layout.MiddlePanelWidth + 3
+		yPos := 4
+
+		if cmd := a.mediaManager.LoadFileAsyncWithPosition(
+			msg.FilePath,
+			msg.Tags.Lyrics,
+			msg.Tags.Artwork,
+			layout.ArtworkMaxWidth,
+			layout.ArtworkMaxHeight,
+			xPos,
+			yPos,
+		); cmd != nil {
+			cmds = append(cmds, cmd)
+		}
+
+		if cmd := a.setStatus("Loaded: "+filepath.Base(msg.FilePath), 1); cmd != nil {
+			cmds = append(cmds, cmd)
+		}
+
+	case FileLoadErrorMsg:
+		a.setError("Failed to read tags", msg.Error.Error())
+		a.isLoading = false
+
+	case ArtworkFetchedMsg:
+		if msg.Error != nil {
+			a.setError("Failed to fetch artwork", msg.Error.Error())
+		} else if len(msg.Artwork) > 0 {
+			a.tagEditor.UpdateArtwork(msg.Artwork)
+
+			layout := a.layout.Calculate()
+			xPos := layout.LeftPanelWidth + layout.MiddlePanelWidth + 3
+			yPos := 4
+
+			if cmd := a.mediaManager.LoadFileAsyncWithPosition(
+				a.currentFile.Path,
+				a.mediaManager.GetLyricsPanel().GetLyrics(),
+				msg.Artwork,
+				layout.ArtworkMaxWidth,
+				layout.ArtworkMaxHeight,
+				xPos,
+				yPos,
+			); cmd != nil {
 				cmds = append(cmds, cmd)
 			}
 
-		case FileLoadErrorMsg:
-			a.setError("Failed to read tags", msg.Error.Error())
-			a.isLoading = false
+			if cmd := a.setStatus("Artwork fetched successfully", 1); cmd != nil {
+				cmds = append(cmds, cmd)
+			}
+		}
 
+	case LyricsFetchedMsg:
+		if msg.Error != nil {
+			a.setError("Failed to fetch lyrics", msg.Error.Error())
+		} else if msg.Lyrics != "" {
+			a.tagEditor.UpdateLyrics(msg.Lyrics)
+
+			a.mediaManager.GetLyricsPanel().SetLyrics(msg.Lyrics)
+
+			if cmd := a.setStatus("Lyrics fetched successfully", 1); cmd != nil {
+				cmds = append(cmds, cmd)
+			}
+		}
+	case StatusTickMsg:
+		a.statusMessage = ""
+		a.statusTimeout = 0
 	}
+
 	return a, tea.Batch(cmds...)
+}
+
+func (a *App) setStatus(message string, timeoutSeconds int) tea.Cmd {
+	a.statusMessage = message
+	a.statusTimeout = timeoutSeconds * 60
+
+	if timeoutSeconds > 0 {
+		duration := time.Duration(timeoutSeconds) * time.Second
+		return tea.Tick(duration, func(t time.Time) tea.Msg {
+			return StatusTickMsg{}
+		})
+	}
+	return nil
 }
 
 func (a *App) setError(message, details string) {
@@ -529,7 +633,64 @@ func (a *App) renderStatusBar() string {
 }
 
 func (a *App) renderArtworkPanel(width, height int) string {
-	return ""
+	theme := a.theme
+
+	if a.currentFile == nil {
+		var lines []string
+		lines = append(lines, "No artwork")
+
+		contentHeight := height - 2
+		for len(lines) < contentHeight {
+			lines = append(lines, "")
+		}
+
+		emptyStyle := lipgloss.NewStyle().
+			Border(theme.PanelBorder).
+			BorderForeground(ColorBorder).
+			Width(width-2).
+			Padding(0, 1)
+		return emptyStyle.Render(strings.Join(lines, "\n"))
+	}
+
+	artworkResult := a.mediaManager.GetArtworkResult()
+
+	var contentLines []string
+	if artworkResult.IsKitty && artworkResult.Error == nil {
+	} else if artworkResult.Error != nil {
+		content := theme.ErrorStyle.Render(IconCross + " " + artworkResult.Content)
+		contentLines = append(contentLines, content)
+	} else if len(artworkResult.ImageData) > 0 {
+		contentLines = strings.Split(artworkResult.Content, "\n")
+	} else {
+		content := theme.MutedTextStyle.Render("No artwork available")
+		contentLines = append(contentLines, content)
+	}
+
+	availableHeight := height - 2
+	contentLinesCount := len(contentLines)
+
+	topPadding := (availableHeight - contentLinesCount) / 2
+	if topPadding < 0 {
+		topPadding = 0
+	}
+
+	var lines []string
+	for i := 0; i < topPadding; i++ {
+		lines = append(lines, "")
+	}
+	lines = append(lines, contentLines...)
+	for len(lines) < availableHeight {
+		lines = append(lines, "")
+	}
+
+	borderStyle := lipgloss.NewStyle().
+		Border(theme.PanelBorder).
+		BorderForeground(ColorBorder).
+		Width(width-2).
+		Padding(0, 1).
+		Align(lipgloss.Center)
+
+	return borderStyle.Render(strings.Join(lines, "\n"))
 }
 
 func (a *App) renderHelp() string {
