@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"tagTonic/config"
+	"tagTonic/mp3"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -155,6 +156,62 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	return a, tea.Batch(cmds...)
+}
+
+func (a *App) loadFile(file *FileEntry) tea.Cmd {
+	a.currentFile = file
+	a.isLoading = true
+
+	clearKittyImages()
+
+	statusCmd := a.setStatus("Loading: "+file.Name, 3)
+
+	loadCmd := func() tea.Msg {
+		result := make(chan tea.Msg, 1)
+
+		go func() {
+			tagEditor := mp3.NewTagEditor()
+			tags, err := tagEditor.ReadTags(file.Path)
+			if err != nil {
+				result <- FileLoadErrorMsg{
+					FilePath: file.Path,
+					Error:    err,
+				}
+				return
+			}
+
+			result <- FileLoadedMsg{
+				FilePath: file.Path,
+				Tags:     tags,
+			}
+		}()
+
+		select {
+		case msg := <-result:
+			return msg
+		case <-time.After(5 * time.Second):
+			return FileLoadErrorMsg{
+				FilePath: file.Path,
+				Error:    fmt.Errorf("tag reading timed out"),
+			}
+		}
+	}
+
+	return tea.Batch(statusCmd, loadCmd)
+}
+
+func (a *App) saveTags() tea.Cmd {
+	if a.currentFile == nil {
+		return nil
+	}
+
+	err := a.tagEditor.SaveTags(a.currentFile.Path)
+	if err != nil {
+		a.setError("Failed to save tags", err.Error())
+		return nil
+	}
+
+	return a.setStatus("Tags saved", 2)
 }
 
 func (a *App) setStatus(message string, timeoutSeconds int) tea.Cmd {

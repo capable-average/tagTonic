@@ -209,8 +209,44 @@ func (fb *FileBrowser) ToggleHidden() {
 	fb.LoadDirectory()
 }
 
+func (fb *FileBrowser) ToggleSelection() {
+	if fb.selectedIndex >= len(fb.filteredEntries) {
+		return
+	}
+
+	selected := fb.filteredEntries[fb.selectedIndex]
+	if !selected.IsMP3 {
+		return
+	}
+
+	if fb.selectedFiles[selected.Path] {
+		delete(fb.selectedFiles, selected.Path)
+	} else {
+		fb.selectedFiles[selected.Path] = true
+	}
+}
+
 func (fb *FileBrowser) IsSelected(path string) bool {
 	return fb.selectedFiles[path]
+}
+
+func (fb *FileBrowser) GetSelectedFiles() []string {
+	var files []string
+	for path := range fb.selectedFiles {
+		files = append(files, path)
+	}
+	return files
+}
+
+func (fb *FileBrowser) ClearSelection() {
+	fb.selectedFiles = make(map[string]bool)
+}
+
+func (fb *FileBrowser) ToggleBatchMode() {
+	fb.batchMode = !fb.batchMode
+	if !fb.batchMode {
+		fb.ClearSelection()
+	}
 }
 
 func (fb *FileBrowser) IsBatchMode() bool {
