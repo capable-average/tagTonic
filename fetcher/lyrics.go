@@ -381,16 +381,12 @@ func (lf *lyricsFetcher) scrapeGeniusLyrics(geniusURL string) (string, error) {
 }
 
 func (lf *lyricsFetcher) cleanHTMLLyrics(html string) string {
-	// First, convert <br> tags to newlines BEFORE stripping HTML
 	html = regexp.MustCompile(`(?i)<br\s*/?\s*>`).ReplaceAllString(html, "\n")
 	
-	// Convert common block-level elements to newlines
 	html = regexp.MustCompile(`(?i)</?(div|p)[^>]*>`).ReplaceAllString(html, "\n")
 	
-	// Strip remaining HTML tags
 	html = regexp.MustCompile(`<[^>]*>`).ReplaceAllString(html, "")
 	
-	// Decode HTML entities
 	replacements := map[string]string{
 		"&amp;":    "&",
 		"&lt;":     "<",
@@ -408,24 +404,20 @@ func (lf *lyricsFetcher) cleanHTMLLyrics(html string) string {
 		html = strings.ReplaceAll(html, entity, replacement)
 	}
 	
-	// Split into lines and clean
 	lines := strings.Split(html, "\n")
 	var cleanLines []string
 	
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
 		
-		// Skip empty lines
 		if line == "" {
 			continue
 		}
 		
-		// Skip contributor/metadata lines (like "68 ContributorsTranslations")
 		if regexp.MustCompile(`^\d+\s*(Contributor|Translation|Embed|Share)`).MatchString(line) {
 			continue
 		}
 		
-		// Skip lines that are just numbers followed by "Contributors"
 		if regexp.MustCompile(`^\d+\s*Contributors?$`).MatchString(line) {
 			continue
 		}

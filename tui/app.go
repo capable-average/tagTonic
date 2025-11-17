@@ -18,8 +18,9 @@ type App struct {
 	fileBrowser  *FileBrowser
 	tagEditor    *TagEditor
 	mediaManager *MediaManager
-	layout         *Layout
-	
+	layout       *Layout
+	cache        *Cache
+
 	currentMode    Mode
 	previousMode   Mode
 	currentFile    *FileEntry
@@ -34,12 +35,14 @@ type App struct {
 }
 
 func NewApp(startDir string) *App {
+	cache := NewCache(50)
 
 	return &App{
 		fileBrowser:  NewFileBrowser(startDir),
 		tagEditor:    NewTagEditor(),
-		mediaManager: NewMediaManager(),
+		mediaManager: NewMediaManager(cache),
 		layout:       NewLayout(),
+		cache:        cache,
 		currentMode:  FileBrowserMode,
 		theme:        DefaultTheme(),
 		isLoading:    false,

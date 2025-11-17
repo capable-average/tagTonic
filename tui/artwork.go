@@ -20,6 +20,7 @@ import (
 )
 
 type ArtworkRenderer struct {
+	cache     *Cache
 	tagEditor mp3.TagEditor
 }
 
@@ -35,13 +36,19 @@ type ArtworkRenderMsg struct {
 	Result   ArtworkResult
 }
 
-func NewArtworkRenderer() *ArtworkRenderer {
+func NewArtworkRenderer(cache *Cache) *ArtworkRenderer {
 	return &ArtworkRenderer{
+		cache:     cache,
 		tagEditor: mp3.NewTagEditor(),
 	}
 }
 
 func (ar *ArtworkRenderer) RenderArtwork(filePath string) ArtworkResult {
+	//try cache first
+	if data, exists := ar.cache.GetArtwork(filePath); exists {
+		return ar.renderArtworkData(data)
+	}
+
 	tags, err := ar.tagEditor.ReadTags(filePath)
 	if err != nil {
 		return ArtworkResult{
@@ -55,6 +62,8 @@ func (ar *ArtworkRenderer) RenderArtwork(filePath string) ArtworkResult {
 			Content: "No artwork found",
 		}
 	}
+
+	ar.cache.SetArtwork(filePath, tags.Artwork)
 
 	return ar.renderArtworkData(tags.Artwork)
 }

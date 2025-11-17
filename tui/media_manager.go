@@ -14,9 +14,9 @@ type MediaManager struct {
 	artworkResult   ArtworkResult
 }
 
-func NewMediaManager() *MediaManager {
+func NewMediaManager(cache *Cache) *MediaManager {
 	return &MediaManager{
-		artworkRenderer: NewArtworkRenderer(),
+		artworkRenderer: NewArtworkRenderer(cache),
 		lyricsPanel:     NewLyricsPanel(),
 		artworkFetcher:  fetcher.NewArtworkFetcher(),
 	}
