@@ -31,6 +31,14 @@ type App struct {
 	theme         *Theme
 	isLoading     bool
 
+	isBatchProcessing bool
+	batchTotal        int
+	batchProcessed    int
+	batchSucceeded    int
+	batchFailed       int
+	batchFilePaths    []string
+	batchMode         string // "lyrics", "artwork", "both"
+
 	config *config.Config
 }
 
@@ -153,6 +161,60 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				cmds = append(cmds, cmd)
 			}
 		}
+
+	case BatchProcessMsg:
+		a.batchProcessed++
+		if msg.Success {
+			a.batchSucceeded++
+		} else {
+			a.batchFailed++
+			logrus.Errorf("Batch process failed for %s: %v", msg.FilePath, msg.Error)
+		}
+
+		if cmd := a.setStatus(fmt.Sprintf("Processing: %d/%d (✓%d ✗%d)",
+			a.batchProcessed, a.batchTotal, a.batchSucceeded, a.batchFailed), 0); cmd != nil {
+			cmds = append(cmds, cmd)
+		}
+
+		if a.batchProcessed < a.batchTotal {
+			switch a.batchMode {
+			case "lyrics":
+				cmds = append(cmds, a.processBatchLyrics(a.batchFilePaths, a.batchProcessed))
+			case "artwork":
+				cmds = append(cmds, a.processBatchArtwork(a.batchFilePaths, a.batchProcessed))
+			case "both":
+				cmds = append(cmds, a.processBatchBoth(a.batchFilePaths, a.batchProcessed))
+			}
+		} else {
+			cmds = append(cmds, func() tea.Msg {
+				return BatchCompleteMsg{
+					Total:     a.batchTotal,
+					Succeeded: a.batchSucceeded,
+					Failed:    a.batchFailed,
+				}
+			})
+		}
+
+	case BatchCompleteMsg:
+		a.isBatchProcessing = false
+		a.batchTotal = 0
+		a.batchProcessed = 0
+		a.batchSucceeded = 0
+		a.batchFailed = 0
+
+		var status string
+		if msg.Failed == 0 {
+			status = fmt.Sprintf("✓ Batch completed successfully: %d files processed", msg.Succeeded)
+		} else if msg.Succeeded == 0 {
+			status = fmt.Sprintf("✗ Batch failed: all %d files had errors", msg.Failed)
+		} else {
+			status = fmt.Sprintf("Batch completed with errors: %d succeeded, %d failed", msg.Succeeded, msg.Failed)
+		}
+
+		if cmd := a.setStatus(status, 3); cmd != nil {
+			cmds = append(cmds, cmd)
+		}
+
 	case StatusTickMsg:
 		a.statusMessage = ""
 		a.statusTimeout = 0
@@ -560,8 +622,17 @@ func (a *App) renderLyricsPanel(width, height int) string {
 	var lyricsHeader string
 
 	if lyricsPanel.HasLyrics() {
+		scrollPercent := 0
+		totalLines := lyricsPanel.GetTotalLines()
+		if totalLines > 0 {
+			scrollPercent = (lyricsPanel.GetScrollOffset() * 100) / totalLines
+		}
+
 		scrollIndicator := ""
 		availableContentHeight := lyricsHeight - 4
+		if totalLines > availableContentHeight {
+			scrollIndicator = theme.MutedTextStyle.Render(fmt.Sprintf(" (%d%%)", scrollPercent))
+		}
 		lyricsHeader = IconMusic + " Lyrics" + scrollIndicator
 
 		visibleLines := lyricsPanel.GetVisibleLines(availableContentHeight)
@@ -630,15 +701,28 @@ func (a *App) renderStatusBar() string {
 
 	switch a.currentMode {
 	case FileBrowserMode:
-		hints = []string{
-			KeyHelp("↑↓", "navigate", theme),
-			KeyHelp("Enter", "select", theme),
-			KeyHelp("Tab", "tags", theme),
-			KeyHelp("/", "search", theme),
-			KeyHelp("b", "batch", theme),
-			KeyHelp("h", "hidden", theme),
-			KeyHelp("?", "help", theme),
-			KeyHelp("q", "quit", theme),
+		if a.fileBrowser.IsBatchMode() {
+			hints = []string{
+				KeyHelp("↑↓", "navigate", theme),
+				KeyHelp("Space", "select", theme),
+				KeyHelp("f", "fetch both", theme),
+				KeyHelp("Ctrl+L", "lyrics", theme),
+				KeyHelp("Ctrl+A", "artwork", theme),
+				KeyHelp("Esc", "exit batch", theme),
+				KeyHelp("?", "help", theme),
+				KeyHelp("q", "quit", theme),
+			}
+		} else {
+			hints = []string{
+				KeyHelp("↑↓", "navigate", theme),
+				KeyHelp("Enter", "select", theme),
+				KeyHelp("Tab", "tags", theme),
+				KeyHelp("/", "search", theme),
+				KeyHelp("b", "batch", theme),
+				KeyHelp("h", "hidden", theme),
+				KeyHelp("?", "help", theme),
+				KeyHelp("q", "quit", theme),
+			}
 		}
 	case TagEditMode:
 		if a.lyricsHasFocus {

@@ -77,3 +77,54 @@ func (a *App) fetchArtworkOnly() tea.Cmd {
 		a.setStatus("Fetching artwork...", 2),
 	)
 }
+
+func (a *App) batchFetchLyrics() tea.Cmd {
+	selectedFiles := a.fileBrowser.GetSelectedFiles()
+	if len(selectedFiles) == 0 {
+		return a.setStatus("No files selected", 2)
+	}
+
+	a.isBatchProcessing = true
+	a.batchTotal = len(selectedFiles)
+	a.batchProcessed = 0
+	a.batchSucceeded = 0
+	a.batchFailed = 0
+	a.batchFilePaths = selectedFiles
+	a.batchMode = "lyrics"
+
+	return a.processBatchLyrics(selectedFiles, 0)
+}
+
+func (a *App) batchFetchArtwork() tea.Cmd {
+	selectedFiles := a.fileBrowser.GetSelectedFiles()
+	if len(selectedFiles) == 0 {
+		return a.setStatus("No files selected", 2)
+	}
+
+	a.isBatchProcessing = true
+	a.batchTotal = len(selectedFiles)
+	a.batchProcessed = 0
+	a.batchSucceeded = 0
+	a.batchFailed = 0
+	a.batchFilePaths = selectedFiles
+	a.batchMode = "artwork"
+
+	return a.processBatchArtwork(selectedFiles, 0)
+}
+
+func (a *App) batchFetchBoth() tea.Cmd {
+	selectedFiles := a.fileBrowser.GetSelectedFiles()
+	if len(selectedFiles) == 0 {
+		return a.setStatus("No files selected", 2)
+	}
+
+	a.isBatchProcessing = true
+	a.batchTotal = len(selectedFiles)
+	a.batchProcessed = 0
+	a.batchSucceeded = 0
+	a.batchFailed = 0
+	a.batchFilePaths = selectedFiles
+	a.batchMode = "both"
+
+	return a.processBatchBoth(selectedFiles, 0)
+}

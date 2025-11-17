@@ -84,11 +84,23 @@ func (a *App) handleFileBrowserKeys(key string) tea.Cmd {
 		a.fileBrowser.ToggleHidden()
 		return a.setStatus("Hidden files: "+map[bool]string{true: "ON", false: "OFF"}[a.fileBrowser.showHidden], 2)
 	case "f", "ctrl+f":
-		return a.fetchBoth()
+		if a.fileBrowser.IsBatchMode() {
+			return a.batchFetchBoth()
+		} else if a.currentFile != nil {
+			return a.fetchBoth()
+		}
 	case "ctrl+l":
-		return a.fetchLyricsOnly()
+		if a.fileBrowser.IsBatchMode() {
+			return a.batchFetchLyrics()
+		} else if a.currentFile != nil {
+			return a.fetchLyricsOnly()
+		}
 	case "ctrl+a":
-		return a.fetchArtworkOnly()
+		if a.fileBrowser.IsBatchMode() {
+			return a.batchFetchArtwork()
+		} else if a.currentFile != nil {
+			return a.fetchArtworkOnly()
+		}
 	}
 
 	return nil
