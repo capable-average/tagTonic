@@ -388,5 +388,5 @@ func (ar *ArtworkRenderer) GetImageInfo(data []byte) (width, height int, format 
 }
 
 func CreateNoArtworkPlaceholder() string {
-	return "No artwork embedded - Press 'f' to fetch"
+	return "No artwork embedded - Press 'ctrl+a' to fetch"
 }

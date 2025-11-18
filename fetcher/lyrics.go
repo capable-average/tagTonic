@@ -144,6 +144,7 @@ func (lf *lyricsFetcher) generateSearchVariants(title, artist string) []searchVa
 	return variants
 }
 
+// Helpers
 func (lf *lyricsFetcher) normalizeForSearch(s string) string {
 	s = strings.ToLower(s)
 	s = strings.TrimSpace(s)
@@ -193,6 +194,7 @@ func (lf *lyricsFetcher) getMainArtist(artist string) string {
 	return strings.TrimSpace(result)
 }
 
+// Genius
 func (lf *lyricsFetcher) fetchFromGenius(title, artist string) (string, error) {
 	searchURL := fmt.Sprintf("https://api.genius.com/search?q=%s",
 		url.QueryEscape(fmt.Sprintf("%s %s", artist, title)))
@@ -325,6 +327,44 @@ func (lf *lyricsFetcher) findBestGeniusMatch(targetTitle, targetArtist string, h
 	return nil
 }
 
+func (lf *lyricsFetcher) calculateSimilarity(s1, s2 string) float64 {
+	if s1 == s2 {
+		return 1.0
+	}
+
+	s1Lower := strings.ToLower(s1)
+	s2Lower := strings.ToLower(s2)
+
+	if strings.Contains(s1Lower, s2Lower) || strings.Contains(s2Lower, s1Lower) {
+		shorter := len(s1)
+		longer := len(s2)
+		if len(s2) < len(s1) {
+			shorter = len(s2)
+			longer = len(s1)
+		}
+		return float64(shorter) / float64(longer)
+	}
+
+	words1 := strings.Fields(s1Lower)
+	words2 := strings.Fields(s2Lower)
+
+	commonWords := 0
+	for _, w1 := range words1 {
+		for _, w2 := range words2 {
+			if w1 == w2 {
+				commonWords++
+				break
+			}
+		}
+	}
+
+	if len(words1) == 0 || len(words2) == 0 {
+		return 0.0
+	}
+
+	return float64(commonWords) / float64(max(len(words1), len(words2)))
+}
+
 func (lf *lyricsFetcher) scrapeGeniusLyrics(geniusURL string) (string, error) {
 	req, err := http.NewRequest("GET", geniusURL, nil)
 	if err != nil {
@@ -428,6 +468,7 @@ func (lf *lyricsFetcher) cleanHTMLLyrics(html string) string {
 	return strings.Join(cleanLines, "\n")
 }
 
+// AZLyrics
 func (lf *lyricsFetcher) fetchFromAZLyrics(title, artist string) (string, error) {
 	artistSlug := lf.createAZLyricsSlug(artist)
 	titleSlug := lf.createAZLyricsSlug(title)
@@ -500,51 +541,6 @@ func (lf *lyricsFetcher) createAZLyricsSlug(s string) string {
 	s = re.ReplaceAllString(s, "")
 
 	return s
-}
-
-func (lf *lyricsFetcher) calculateSimilarity(s1, s2 string) float64 {
-	if s1 == s2 {
-		return 1.0
-	}
-
-	s1Lower := strings.ToLower(s1)
-	s2Lower := strings.ToLower(s2)
-
-	if strings.Contains(s1Lower, s2Lower) || strings.Contains(s2Lower, s1Lower) {
-		shorter := len(s1)
-		longer := len(s2)
-		if len(s2) < len(s1) {
-			shorter = len(s2)
-			longer = len(s1)
-		}
-		return float64(shorter) / float64(longer)
-	}
-
-	words1 := strings.Fields(s1Lower)
-	words2 := strings.Fields(s2Lower)
-
-	commonWords := 0
-	for _, w1 := range words1 {
-		for _, w2 := range words2 {
-			if w1 == w2 {
-				commonWords++
-				break
-			}
-		}
-	}
-
-	if len(words1) == 0 || len(words2) == 0 {
-		return 0.0
-	}
-
-	return float64(commonWords) / float64(max(len(words1), len(words2)))
-}
-
-func max(a, b int) int {
-	if a > b {
-		return a
-	}
-	return b
 }
 
 func (lf *lyricsFetcher) fetchFromLyricsOvh(title, artist string) (string, error) {
@@ -649,10 +645,7 @@ func (lf *lyricsFetcher) fetchFromChartLyrics(title, artist string) (string, err
 		"&gt;", ">",
 	)
 	lyric = replacer.Replace(lyric)
-
 	lyric = regexp.MustCompile(`([.!?])\s+([A-Z])`).ReplaceAllString(lyric, "$1\n$2")
-
-	lyric = regexp.MustCompile(`\s+(You better|The |His |He's |I |But |So |And |'Cuz|No more)`).ReplaceAllString(lyric, "\n$1")
 
 	return lyric, nil
 }

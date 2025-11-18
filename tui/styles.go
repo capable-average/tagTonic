@@ -139,7 +139,8 @@ func DefaultTheme() *Theme {
 const (
 	IconFile       = "📄"
 	IconFolder     = "📁"
-	IconMusic      = "🎵"
+	IconMusic      = "♫"
+	IconLyrics     = "🎤"
 	IconCheck      = "✓"
 	IconCross      = "✗"
 	IconArrowRight = "▶"

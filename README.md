@@ -2,55 +2,86 @@
 
 # tagTonic
 
-Lightweight MP3 tag editor & fetcher with a fast CLI and polished terminal UI (Go + Cobra + Bubble Tea) with image rendering support using kitty protocol ₍^. .^₎⟆
+Edit tags, pull lyrics and album art right from your terminal. Supports image rendering in terminal using Kitty Protocol ₍^. .^₎⟆ 
+
+![alt text](assets/main-1.png)
+
+[![Go Version](https://img.shields.io/badge/Go-1.21+-00ADD8?style=flat&logo=go)](https://go.dev/)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 </div>
 
-## Key Features
+---
 
-- Edit core tags: title, artist, album, genre, year, lyrics, artwork
-- Fetch lyrics & artwork from multiple online sources
-- Batch operations over directories (recursive + pattern match)
-- Integrated TUI (navigation, preview, editing) or pure CLI usage
-- Artwork & lyrics preview / replace
+## Core Features
 
-## Install
+**Modern TUI** – Bubble Tea + Kitty protocol artwork rendering  
+**Batch Processing** – Fast batch processing using goroutines  
+**Smart Fetching** – Auto-grab lyrics & artwork from Genius, iTunes, and more using mp3 metadata
+
+---
+
+## Get Started
 
 ```bash
-git clone https://github.com/sumit_pathak/tagTonic.git
+# Clone and build
+git clone https://github.com/sk-pathak/tagTonic.git
 cd tagTonic
-go mod tidy
-go build -o tagTonic
-./tagTonic tui   # launch UI
-```
-Requires: Go 1.21+
+make build
 
-## Quick Usage
+# Launch tui
+./tagTonic tui
+```
+
+![usage gif](assets/usage.gif)
+
+**Requirements:** Go 1.21+
+
+---
+
+## Some Quick Fire Commands
 
 ```bash
-# Launch TUI
+# Fire up the TUI
 tagTonic tui
 
-# Edit tags
-tagTonic edit song.mp3 --title "Title" --artist "Artist" --album "Album"
+# Edit tags inline
+tagTonic edit song.mp3 --title "Song Title" --artist "Artist" --album "Album"
 
-# Fetch lyrics & artwork
+# Auto-fetch metadata
 tagTonic fetch song.mp3 --lyrics --artwork
 
-# Batch process a directory
-tagTonic batch --dir ./music --lyrics --artwork --recursive
+# Batch process entire library
+tagTonic batch --dir ./music --recursive --lyrics --artwork
 ```
 
-## Pics
+---
 
-![No lyrics Demo Image](docs/demo_no_lyrics.png)
-![With Lyrics Demo Image](docs/demo_lyrics.png)
+## Commands Cheat Sheet
 
-## Primary Commands
+| Command | Action | Key Flags |
+|---------|--------------|-----------|
+| `tui` | Launch the interactive UI | – |
+| `edit` | Manually set tags | `--title` `--artist` `--album` `--genre` `--year` `--lyrics` `--artwork` |
+| `fetch` | Auto-fetch from APIs | `--lyrics` `--artwork` `--force` |
+| `batch` | Process multiple files | `--dir` `--recursive` `--pattern` `--lyrics` `--artwork` `--force` |
+| `show` | Display current metadata | – |
 
-| Command | Purpose | Common Flags |
-|---------|---------|--------------|
-| `tui`   | Launch interactive interface | – |
-| `edit`  | Set or replace tags | `--title --artist --album --genre --year --lyrics --artwork` |
-| `fetch` | Pull lyrics/artwork from APIs | `--lyrics --artwork --force` |
-| `batch` | Apply fetch/edit over many files | `--dir --pattern --lyrics --artwork --recursive` |
+Full docs → [USAGE.md](docs/USAGE.md)
+
+---
+
+## Development
+
+```bash
+make build    # Compile
+make run      # Build + launch TUI
+make lint     # Code quality checks
+```
+
+---
+
+## License
+
+MIT © [sk-pathak](https://github.com/sk-pathak)
+</div>

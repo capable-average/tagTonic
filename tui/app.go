@@ -358,7 +358,7 @@ func (a *App) renderFileBrowser(width, height int) string {
 
 	header := IconFolder + " Files"
 	if a.fileBrowser.IsSearchMode() {
-		header = IconSearch + " Search: " + theme.HighlightStyle.Render(a.fileBrowser.GetSearchQuery())
+		header = IconSearch + " Search: " + theme.NormalTextStyle.Render(a.fileBrowser.GetSearchQuery())
 	}
 	if a.fileBrowser.IsBatchMode() {
 		header += " " + StatusBadge("BATCH", "info", theme)
@@ -633,7 +633,7 @@ func (a *App) renderLyricsPanel(width, height int) string {
 		if totalLines > availableContentHeight {
 			scrollIndicator = theme.MutedTextStyle.Render(fmt.Sprintf(" (%d%%)", scrollPercent))
 		}
-		lyricsHeader = IconMusic + " Lyrics" + scrollIndicator
+		lyricsHeader = IconLyrics + " Lyrics" + scrollIndicator
 
 		visibleLines := lyricsPanel.GetVisibleLines(availableContentHeight)
 		var styledLines []string
@@ -662,7 +662,7 @@ func (a *App) renderLyricsPanel(width, height int) string {
 
 		lyricsContent = strings.Join(styledLines, "\n")
 	} else {
-		lyricsHeader = IconMusic + " Lyrics"
+		lyricsHeader = IconLyrics + " Lyrics"
 		lyricsContent = theme.MutedTextStyle.Render("\n  No lyrics available\n  Press 'f' to fetch")
 	}
 
@@ -854,8 +854,8 @@ func (a *App) renderHelp() string {
 ║   h           Toggle hidden files                            ║
 ║   Tab         Switch to tag editor                           ║
 ║                                                              ║
-║ Batch Mode (after selecting files with Space):              ║
-║   f, Ctrl+F   Fetch lyrics and artwork for all              ║
+║ Batch Mode (after selecting files with Space):               ║
+║   f, Ctrl+F   Fetch lyrics and artwork for all               ║
 ║   Ctrl+L      Fetch lyrics only for all                      ║
 ║   Ctrl+A      Fetch artwork only for all                     ║
 ║   Esc         Exit batch mode                                ║
@@ -890,7 +890,7 @@ func (a *App) renderHelp() string {
 ║   q, Ctrl+C   Quit application                               ║
 ╚══════════════════════════════════════════════════════════════╝
 
-Press any key to return...`
+Press esc key to return...`
 }
 
 func sanitizeLyricsLine(line string) string {

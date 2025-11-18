@@ -101,7 +101,7 @@ func (af *artworkFetcher) fetchFromMusicBrainz(title, artist, album string) ([]b
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("User-Agent", "tagTonic/1.0 (https://github.com/sumit_pathak/tagTonic)")
+	req.Header.Set("User-Agent", "tagTonic/1.0 (https://github.com/sk-pathak/tagTonic)")
 
 	resp, err := af.client.Do(req)
 	if err != nil {
@@ -134,7 +134,7 @@ func (af *artworkFetcher) fetchFromMusicBrainz(title, artist, album string) ([]b
 	}
 	for _, u := range attempts {
 		imgReq, _ := http.NewRequest("GET", u, nil)
-		imgReq.Header.Set("User-Agent", "tagTonic/1.0 (https://github.com/sumit_pathak/tagTonic)")
+		imgReq.Header.Set("User-Agent", "tagTonic/1.0 (https://github.com/sk-pathak/tagTonic)")
 		imgResp, err := af.client.Do(imgReq)
 		if err != nil {
 			continue
