@@ -17,25 +17,41 @@ Edit tags, pull lyrics and album art right from your terminal. Supports image re
 
 **Modern TUI** – Bubble Tea + Kitty protocol artwork rendering  
 **Batch Processing** – Fast batch processing using goroutines  
-**Smart Fetching** – Auto-grab lyrics & artwork from Genius, iTunes, and more using mp3 metadata
+**Smart Fetching** – Auto-grab lyrics & artwork using mp3 metadata
 
 ---
 
 ## Get Started
 
+**Requirements:** Go 1.21+
+
+#### Clone
+
 ```bash
 # Clone and build
 git clone https://github.com/sk-pathak/tagTonic.git
 cd tagTonic
-make build
+```
+#### 1. Build with make
 
+```
+make build 
+```
+
+#### 2. Build without make
+```
+mkdir build
+go build -o tagTonic
+```
+
+#### Run tagTonic
+
+```
 # Launch tui
-./tagTonic tui
+./build/tagTonic tui
 ```
 
 ![usage gif](assets/usage.gif)
-
-**Requirements:** Go 1.21+
 
 ---
 
@@ -80,6 +96,8 @@ make lint     # Code quality checks
 ```
 
 ---
+
+<div align="center">
 
 ## License
 

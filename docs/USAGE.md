@@ -70,8 +70,8 @@ tagTonic fetch <file.mp3> [flags]
 
 | Flag | Description |
 |------|-------------|
-| `--lyrics` | Fetch lyrics from Genius or Lyrics.OVH |
-| `--artwork` | Fetch artwork from iTunes, MusicBrainz, or Cover Art Archive |
+| `--lyrics` | Fetch lyrics |
+| `--artwork` | Fetch artwork |
 | `--force` | Overwrite existing data |
 
 **Examples:**
