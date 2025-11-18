@@ -14,13 +14,13 @@ import (
 )
 
 type TagUpdates struct {
-	Title   string
-	Artist  string
-	Album   string
-	Genre   string
-	Year    int
-	Lyrics  string
-	Artwork []byte
+	Title        string
+	Artist       string
+	Album        string
+	Genre        string
+	Year         int
+	Lyrics       string
+	Artwork      []byte
 	ClearLyrics  bool
 	ClearArtwork bool
 }

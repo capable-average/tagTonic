@@ -18,14 +18,14 @@ import (
 )
 
 var (
-	batchDir         string
-	batchPattern     string
-	batchLyrics      bool
-	batchArtwork     bool
-	batchRecursive   bool
-	batchForce       bool
-	batchWorkers     int
-	batchNoProgress  bool
+	batchDir        string
+	batchPattern    string
+	batchLyrics     bool
+	batchArtwork    bool
+	batchRecursive  bool
+	batchForce      bool
+	batchWorkers    int
+	batchNoProgress bool
 )
 
 var batchCmd = &cobra.Command{
@@ -77,12 +77,12 @@ Examples:
 		}
 
 		stats := processBatchConcurrently(files, batchWorkers, bar)
-		
+
 		if bar != nil {
 			bar.Finish()
 		}
-		
-		logrus.Infof("Batch complete: processed=%d updated=%d skipped=%d errors=%d", 
+
+		logrus.Infof("Batch complete: processed=%d updated=%d skipped=%d errors=%d",
 			stats.processed, stats.updated, stats.skipped, stats.errors)
 	},
 }
@@ -219,11 +219,11 @@ func processBatchConcurrently(files []string, numWorkers int, bar *progressbar.P
 
 	for result := range results {
 		stats.incrementProcessed()
-		
+
 		if bar != nil {
 			bar.Add(1)
 		}
-		
+
 		if result.error != nil {
 			stats.incrementErrors()
 			if bar != nil {
@@ -255,14 +255,14 @@ func worker(ctx context.Context, jobs <-chan FileJob, results chan<- FileResult,
 	defer wg.Done()
 
 	editor := mp3.NewTagEditor()
-	
+
 	var lyricsFetcher fetcher.LyricsFetcher
 	if cfg.GeniusAPIKey != "" {
 		lyricsFetcher = fetcher.NewLyricsFetcherWithConfig(cfg.GeniusAPIKey)
 	} else {
 		lyricsFetcher = fetcher.NewLyricsFetcher()
 	}
-	
+
 	artworkFetcher := fetcher.NewArtworkFetcher()
 
 	for job := range jobs {

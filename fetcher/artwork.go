@@ -30,17 +30,17 @@ func (af *artworkFetcher) Fetch(title, artist, album string) ([]byte, error) {
 	if title == "" && artist == "" && album == "" {
 		return nil, fmt.Errorf("at least one of title, artist, or album is required")
 	}
-	
+
 	sources := []func(string, string, string) ([]byte, error){
 		af.fetchFromDeezer,
 		af.fetchFromITunes,
 		af.fetchFromMusicBrainz,
 	}
-	
+
 	if artwork := af.fetchConcurrently(title, artist, album, sources); len(artwork) > 0 {
 		return artwork, nil
 	}
-	
+
 	return nil, fmt.Errorf("failed to fetch artwork from free sources")
 }
 

@@ -72,7 +72,7 @@ var showCmd = &cobra.Command{
 			cache := tui.NewCache(10)
 			artworkRenderer := tui.NewArtworkRenderer(cache)
 			result := artworkRenderer.RenderArtwork(file)
-			
+
 			if result.Error != nil {
 				logrus.Warnf("Failed to display artwork: %v", result.Error)
 			} else {

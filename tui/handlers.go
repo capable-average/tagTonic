@@ -168,6 +168,16 @@ func (a *App) handleTagEditKeys(key string) tea.Cmd {
 		if a.currentFile != nil {
 			return a.fetchArtworkOnly()
 		}
+	case "u":
+		if a.tagEditor.CanUndo() {
+			a.tagEditor.Undo()
+			return a.setStatus("Undone", 1)
+		}
+	case "r":
+		if a.tagEditor.CanRedo() {
+			a.tagEditor.Redo()
+			return a.setStatus("Redone", 1)
+		}
 	case "f":
 		if a.currentFile != nil {
 			return a.fetchBoth()

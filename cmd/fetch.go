@@ -45,7 +45,7 @@ Examples:
 		}
 
 		editor := mp3.NewTagEditor()
-		
+
 		var lyricsFetcher fetcher.LyricsFetcher
 		if cfg.GeniusAPIKey != "" {
 			lyricsFetcher = fetcher.NewLyricsFetcherWithConfig(cfg.GeniusAPIKey)
@@ -54,7 +54,7 @@ Examples:
 			lyricsFetcher = fetcher.NewLyricsFetcher()
 			logrus.Debug("Using Genius API without authentication (limited access)")
 		}
-		
+
 		artworkFetcher := fetcher.NewArtworkFetcher()
 
 		tags, err := editor.ReadTags(filePath)

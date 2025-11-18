@@ -58,6 +58,7 @@ func (te *TagEditor) LoadTags(tags *mp3.MP3Tags) {
 	}
 	te.isDirty = false
 	te.validationErrs = make(map[string]string)
+	te.clearUndoRedo()
 }
 
 func (te *TagEditor) GetFields() []TagField {
@@ -150,6 +151,8 @@ func (te *TagEditor) saveFieldValue(fieldIndex int, value string) {
 	if te.currentTags == nil {
 		return
 	}
+
+	te.createUndoSnapshot()
 
 	switch fieldIndex {
 	case FieldTitle:
@@ -244,6 +247,7 @@ func (te *TagEditor) UpdateLyrics(lyrics string) {
 		return
 	}
 
+	te.createUndoSnapshot()
 	te.currentTags.Lyrics = lyrics
 	te.isDirty = true
 }
@@ -253,8 +257,86 @@ func (te *TagEditor) UpdateArtwork(artwork []byte) {
 		return
 	}
 
+	te.createUndoSnapshot()
 	te.currentTags.Artwork = artwork
 	te.isDirty = true
+}
+
+func (te *TagEditor) Undo() bool {
+	if len(te.undoStack) == 0 {
+		return false
+	}
+
+	te.redoStack = append(te.redoStack, te.copyTags(te.currentTags))
+
+	lastIndex := len(te.undoStack) - 1
+	te.currentTags = te.undoStack[lastIndex]
+	te.undoStack = te.undoStack[:lastIndex]
+
+	te.isDirty = true
+	return true
+}
+
+func (te *TagEditor) Redo() bool {
+	if len(te.redoStack) == 0 {
+		return false
+	}
+
+	te.undoStack = append(te.undoStack, te.copyTags(te.currentTags))
+
+	lastIndex := len(te.redoStack) - 1
+	te.currentTags = te.redoStack[lastIndex]
+	te.redoStack = te.redoStack[:lastIndex]
+
+	te.isDirty = true
+	return true
+}
+
+func (te *TagEditor) CanUndo() bool {
+	return len(te.undoStack) > 0
+}
+
+func (te *TagEditor) CanRedo() bool {
+	return len(te.redoStack) > 0
+}
+
+func (te *TagEditor) createUndoSnapshot() {
+	if te.currentTags == nil {
+		return
+	}
+
+	const maxUndoSize = 20
+	if len(te.undoStack) >= maxUndoSize {
+		te.undoStack = te.undoStack[1:]
+	}
+
+	te.undoStack = append(te.undoStack, te.copyTags(te.currentTags))
+
+	te.redoStack = make([]*mp3.MP3Tags, 0)
+}
+
+func (te *TagEditor) clearUndoRedo() {
+	te.undoStack = make([]*mp3.MP3Tags, 0)
+	te.redoStack = make([]*mp3.MP3Tags, 0)
+}
+
+func (te *TagEditor) copyTags(tags *mp3.MP3Tags) *mp3.MP3Tags {
+	if tags == nil {
+		return nil
+	}
+
+	artwork := make([]byte, len(tags.Artwork))
+	copy(artwork, tags.Artwork)
+
+	return &mp3.MP3Tags{
+		Title:   tags.Title,
+		Artist:  tags.Artist,
+		Album:   tags.Album,
+		Genre:   tags.Genre,
+		Year:    tags.Year,
+		Lyrics:  tags.Lyrics,
+		Artwork: artwork,
+	}
 }
 
 func (te *TagEditor) validateTitle(value string) error {

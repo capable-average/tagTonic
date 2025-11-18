@@ -20,7 +20,7 @@ type Config struct {
 	EnableLogging    bool   `mapstructure:"enable_logging"`
 	LogLevel         string `mapstructure:"log_level"`
 
-	ShowFileSize    bool   `mapstructure:"show_file_size"`
+	ShowFileSize bool `mapstructure:"show_file_size"`
 
 	PreferredLyricsSource  string `mapstructure:"preferred_lyrics_source"`
 	PreferredArtworkSource string `mapstructure:"preferred_artwork_source"`
@@ -33,7 +33,7 @@ type Config struct {
 
 func DefaultConfig() *Config {
 	return &Config{
-		DefaultDirectory:        ".",
+		DefaultDirectory:       ".",
 		MaxFileSize:            100 * 1024 * 1024, // 100MB
 		EnableLogging:          true,
 		LogLevel:               "info",
