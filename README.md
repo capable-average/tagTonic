@@ -4,6 +4,8 @@
 
 Edit tags, pull lyrics and album art right from your terminal. Supports image rendering in terminal using Kitty Protocol ₍^. .^₎⟆ 
 
+[Article on dev.to](https://dev.to/capable_average/tagtonic-automating-10-years-of-messy-mp3-metadata-using-go-4b3j)
+
 ![alt text](assets/main-1.png)
 
 [![Go Version](https://img.shields.io/badge/Go-1.21+-00ADD8?style=flat&logo=go)](https://go.dev/)
