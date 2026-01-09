@@ -1,6 +1,9 @@
 package tui
 
-import tea "github.com/charmbracelet/bubbletea"
+import (
+	tea "github.com/charmbracelet/bubbletea"
+	"tagTonic/mp3"
+)
 
 func (a *App) fetchBoth() tea.Cmd {
 	if a.currentFile == nil {
@@ -127,4 +130,50 @@ func (a *App) batchFetchBoth() tea.Cmd {
 	a.batchMode = "both"
 
 	return a.processBatchBoth(selectedFiles, 0)
+}
+
+func (a *App) applyBulkTags() tea.Cmd {
+	if !a.bulkTagEditor.HasEnabledFields() {
+		return a.setStatus("No fields enabled for bulk editing", 2)
+	}
+
+	if a.bulkTagEditor.HasValidationErrors() {
+		return a.setStatus("Cannot apply: validation errors present", 2)
+	}
+
+	selectedFiles := a.fileBrowser.GetSelectedFiles()
+	if len(selectedFiles) == 0 {
+		return a.setStatus("No files selected", 2)
+	}
+
+	a.isBatchProcessing = true
+	a.batchTotal = len(selectedFiles)
+	a.batchProcessed = 0
+	a.batchSucceeded = 0
+	a.batchFailed = 0
+	a.batchFilePaths = selectedFiles
+
+	return a.applyBulkTagsToFile(selectedFiles[0])
+}
+
+func (a *App) applyBulkTagsToFile(filePath string) tea.Cmd {
+	return func() tea.Msg {
+		te := mp3.NewTagEditor()
+		updates := a.bulkTagEditor.GetUpdates()
+
+		err := te.EditTags(filePath, updates)
+		if err != nil {
+			return BatchTagAppliedMsg{
+				FilePath: filePath,
+				Success:  false,
+				Error:    err,
+			}
+		}
+
+		return BatchTagAppliedMsg{
+			FilePath: filePath,
+			Success:  true,
+			Error:    nil,
+		}
+	}
 }

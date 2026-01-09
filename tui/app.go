@@ -15,11 +15,12 @@ import (
 )
 
 type App struct {
-	fileBrowser  *FileBrowser
-	tagEditor    *TagEditor
-	mediaManager *MediaManager
-	layout       *Layout
-	cache        *Cache
+	fileBrowser   *FileBrowser
+	tagEditor     *TagEditor
+	bulkTagEditor *BulkTagEditor
+	mediaManager  *MediaManager
+	layout        *Layout
+	cache         *Cache
 
 	currentMode    Mode
 	previousMode   Mode
@@ -46,14 +47,15 @@ func NewApp(startDir string) *App {
 	cache := NewCache(50)
 
 	return &App{
-		fileBrowser:  NewFileBrowser(startDir),
-		tagEditor:    NewTagEditor(),
-		mediaManager: NewMediaManager(cache),
-		layout:       NewLayout(),
-		cache:        cache,
-		currentMode:  FileBrowserMode,
-		theme:        DefaultTheme(),
-		isLoading:    false,
+		fileBrowser:   NewFileBrowser(startDir),
+		tagEditor:     NewTagEditor(),
+		bulkTagEditor: NewBulkTagEditor(),
+		mediaManager:  NewMediaManager(cache),
+		layout:        NewLayout(),
+		cache:         cache,
+		currentMode:   FileBrowserMode,
+		theme:         DefaultTheme(),
+		isLoading:     false,
 	}
 }
 
@@ -213,6 +215,32 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		if cmd := a.setStatus(status, 3); cmd != nil {
 			cmds = append(cmds, cmd)
+		}
+
+	case BatchTagAppliedMsg:
+		a.batchProcessed++
+		if msg.Success {
+			a.batchSucceeded++
+		} else {
+			a.batchFailed++
+			logrus.Errorf("Batch tag edit failed for %s: %v", msg.FilePath, msg.Error)
+		}
+
+		if cmd := a.setStatus(fmt.Sprintf("Applying tags: %d/%d (✓%d ✗%d)",
+			a.batchProcessed, a.batchTotal, a.batchSucceeded, a.batchFailed), 0); cmd != nil {
+			cmds = append(cmds, cmd)
+		}
+
+		if a.batchProcessed < a.batchTotal {
+			cmds = append(cmds, a.applyBulkTagsToFile(a.batchFilePaths[a.batchProcessed]))
+		} else {
+			cmds = append(cmds, func() tea.Msg {
+				return BatchCompleteMsg{
+					Total:     a.batchTotal,
+					Succeeded: a.batchSucceeded,
+					Failed:    a.batchFailed,
+				}
+			})
 		}
 
 	case StatusTickMsg:
@@ -460,6 +488,13 @@ func (a *App) renderFileBrowser(width, height int) string {
 	var footerLine string
 	if len(entries) > 0 {
 		footer := fmt.Sprintf("%d/%d files", selectedIndex+1, len(entries))
+
+		// If batch mode also list amount of files selected in the footer
+		if a.fileBrowser.IsBatchMode() {
+			selectedCount := len(a.fileBrowser.GetSelectedFiles())
+			footer += fmt.Sprintf(" │ %d selected", selectedCount)
+		}
+
 		if len(entries) > contentHeight {
 			scrollPercent := float64(selectedIndex) / float64(len(entries)-1) * 100
 			footer += fmt.Sprintf(" │ %d%%", int(scrollPercent))
@@ -497,7 +532,8 @@ func (a *App) renderFileBrowser(width, height int) string {
 }
 
 func (a *App) renderMiddlePanel(width, height, tagHeight int) string {
-	if a.currentFile == nil {
+	// Allow rendering when in batch tag edit mode even if no current file
+	if a.currentFile == nil && a.currentMode != BatchTagEditMode && a.currentMode != BatchFieldEditMode {
 		var lines []string
 		lines = append(lines, "No file selected")
 
@@ -527,6 +563,100 @@ func (a *App) renderTagsPanel(width, height int) string {
 	theme := a.theme
 	var lines []string
 
+	// Check if we're in batch tag edit mode (including field editing)
+	if a.currentMode == BatchTagEditMode || a.currentMode == BatchFieldEditMode {
+		header := IconMusic + " Batch Tag Editor"
+		selectedCount := len(a.fileBrowser.GetSelectedFiles())
+		header += " " + StatusBadge(fmt.Sprintf("%d FILES", selectedCount), "info", theme)
+
+		headerLine := theme.HeaderStyle.Render(header)
+		lines = append(lines, headerLine)
+
+		sepWidth := max(width-6, 1)
+		lines = append(lines, Separator(sepWidth, "─", ColorBorderLight))
+
+		fields := a.bulkTagEditor.GetFields()
+		editingField := a.bulkTagEditor.GetEditingField()
+
+		for i, field := range fields {
+			var lineContent string
+			if i == editingField {
+				lineContent = IconArrowRight + " "
+			} else {
+				lineContent = "  "
+			}
+
+			// Show indicator for fields that will be applied (have values and are enabled)
+			if a.bulkTagEditor.IsFieldEnabled(i) && field.Value != "" && field.Value != "<multiple values>" {
+				lineContent += theme.SuccessStyle.Render("[✓] ")
+			} else if a.bulkTagEditor.IsFieldEnabled(i) {
+				lineContent += theme.MutedTextStyle.Render("[✓] ")
+			} else {
+				lineContent += "    "
+			}
+
+			label := theme.MutedTextStyle.Render(field.Name + ":")
+			lineContent += label + " "
+
+			value := field.Value
+			if a.bulkTagEditor.IsEditing() && i == editingField && a.currentMode == BatchFieldEditMode {
+				value = a.bulkTagEditor.GetEditBuffer() + theme.EditingStyle.Render("_")
+			} else if value == "" {
+				value = theme.MutedTextStyle.Render("(empty)")
+			} else if value == "<multiple values>" {
+				value = theme.MutedTextStyle.Render(value)
+			} else {
+				maxValueLen := width - 25
+				if len(value) > maxValueLen {
+					value = value[:maxValueLen-3] + theme.MutedTextStyle.Render("...")
+				}
+				value = theme.FieldValueStyle.Render(value)
+			}
+
+			lineContent += value
+
+			if a.bulkTagEditor.IsEditing() && i == editingField && a.currentMode == BatchFieldEditMode {
+				lineContent = theme.EditingStyle.Render(lineContent)
+			}
+
+			lines = append(lines, lineContent)
+
+			if err := a.bulkTagEditor.GetValidationError(field.Name); err != "" {
+				errorLine := "  " + theme.ErrorStyle.Render(IconCross+" "+err)
+				lines = append(lines, errorLine)
+			}
+		}
+
+		var hints []string
+		if a.bulkTagEditor.HasEnabledFields() {
+			hints = append(hints, theme.SuccessStyle.Render("s:save"))
+		}
+		hints = append(hints, theme.MutedTextStyle.Render("e:edit"))
+		hints = append(hints, theme.MutedTextStyle.Render("f:fetch"))
+		hints = append(hints, theme.MutedTextStyle.Render("Tab:files"))
+
+		footer := strings.Join(hints, theme.MutedTextStyle.Render(" │ "))
+		footerLine := theme.MutedTextStyle.Render(footer)
+
+		contentHeight := height - 2
+		for len(lines) < contentHeight-1 {
+			lines = append(lines, "")
+		}
+
+		lines = append(lines, footerLine)
+
+		content := strings.Join(lines, "\n")
+
+		borderStyle := lipgloss.NewStyle().
+			Border(theme.PanelBorder).
+			Width(width-2).
+			Padding(0, 1).
+			BorderForeground(ColorPrimary)
+
+		return borderStyle.Render(content)
+	}
+
+	// Regular tag editor (single file mode)
 	header := IconMusic + " Tags"
 	if a.tagEditor.IsDirty() {
 		header += " " + StatusBadge("MODIFIED", "warning", theme)
@@ -702,15 +832,30 @@ func (a *App) renderStatusBar() string {
 	switch a.currentMode {
 	case FileBrowserMode:
 		if a.fileBrowser.IsBatchMode() {
-			hints = []string{
-				KeyHelp("↑↓", "navigate", theme),
-				KeyHelp("Space", "select", theme),
-				KeyHelp("f", "fetch both", theme),
-				KeyHelp("Ctrl+L", "lyrics", theme),
-				KeyHelp("Ctrl+A", "artwork", theme),
-				KeyHelp("Esc", "exit batch", theme),
-				KeyHelp("?", "help", theme),
-				KeyHelp("q", "quit", theme),
+			selectedCount := len(a.fileBrowser.GetSelectedFiles())
+			if selectedCount > 0 {
+				hints = []string{
+					KeyHelp("↑↓", "navigate", theme),
+					KeyHelp("Space", "select", theme),
+					KeyHelp("Tab/Enter", "bulk edit", theme),
+					KeyHelp("f", "fetch both", theme),
+					KeyHelp("Ctrl+L", "lyrics", theme),
+					KeyHelp("Ctrl+A", "artwork", theme),
+					KeyHelp("Esc", "exit batch", theme),
+					KeyHelp("?", "help", theme),
+					KeyHelp("q", "quit", theme),
+				}
+			} else {
+				hints = []string{
+					KeyHelp("↑↓", "navigate", theme),
+					KeyHelp("Space", "select", theme),
+					KeyHelp("f", "fetch both", theme),
+					KeyHelp("Ctrl+L", "lyrics", theme),
+					KeyHelp("Ctrl+A", "artwork", theme),
+					KeyHelp("Esc", "exit batch", theme),
+					KeyHelp("?", "help", theme),
+					KeyHelp("q", "quit", theme),
+				}
 			}
 		} else {
 			hints = []string{
@@ -769,6 +914,23 @@ func (a *App) renderStatusBar() string {
 			KeyHelp("Edit", "lyrics", theme),
 			KeyHelp("Ctrl+S", "save", theme),
 			KeyHelp("Esc", "cancel", theme),
+		}
+	case BatchTagEditMode:
+		hints = []string{
+			KeyHelp("↑↓", "navigate", theme),
+			KeyHelp("e", "edit field", theme),
+			KeyHelp("s", "save", theme),
+			KeyHelp("f", "fetch", theme),
+			KeyHelp("Tab", "files", theme),
+			KeyHelp("Esc", "exit", theme),
+			KeyHelp("?", "help", theme),
+		}
+	case BatchFieldEditMode:
+		hints = []string{
+			KeyHelp("Type", "edit", theme),
+			KeyHelp("Enter", "save", theme),
+			KeyHelp("Esc", "cancel", theme),
+			KeyHelp("Ctrl+U", "clear", theme),
 		}
 	case HelpMode:
 		return theme.NormalTextStyle.Render("Press esc key to return")
@@ -858,7 +1020,18 @@ func (a *App) renderHelp() string {
 ║   f, Ctrl+F   Fetch lyrics and artwork for all               ║
 ║   Ctrl+L      Fetch lyrics only for all                      ║
 ║   Ctrl+A      Fetch artwork only for all                     ║
+║   Tab         Open bulk tag editor                           ║
 ║   Esc         Exit batch mode                                ║
+║                                                              ║
+║ Batch Tag Editor (Tab from batch mode):                      ║
+║   ↑/↓, k/j    Navigate fields                                ║
+║   Enter, e    Edit field value                               ║
+║   s, Ctrl+S   Save/apply tags to all selected files          ║
+║   f, Ctrl+F   Fetch lyrics and artwork for all               ║
+║   Ctrl+L      Fetch lyrics only for all                      ║
+║   Ctrl+A      Fetch artwork only for all                     ║
+║   Tab         Switch to file browser                         ║
+║   Esc         Exit bulk tag editor                           ║
 ║                                                              ║
 ║ Tag Editor:                                                  ║
 ║   ↑/↓, k/j    Navigate fields                                ║
