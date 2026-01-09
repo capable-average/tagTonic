@@ -11,6 +11,8 @@ const (
 	LyricsEditMode
 	SearchMode
 	HelpMode
+	BatchTagEditMode
+	BatchFieldEditMode
 )
 
 type FileLoadedMsg struct {
@@ -43,6 +45,12 @@ type BatchCompleteMsg struct {
 	Total     int
 	Succeeded int
 	Failed    int
+}
+
+type BatchTagAppliedMsg struct {
+	FilePath string
+	Success  bool
+	Error    error
 }
 
 type StatusTickMsg struct{}

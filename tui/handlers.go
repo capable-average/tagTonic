@@ -22,8 +22,12 @@ func (a *App) handleKeyPress(key string) tea.Cmd {
 			return a.handleSearchKeys(key)
 		case FieldEditMode:
 			return a.handleFieldEditKeys(key)
+		case BatchFieldEditMode:
+			return a.handleBatchFieldEditKeys(key)
 		case LyricsEditMode:
 			return a.handleLyricsEditKeys(key)
+		case BatchTagEditMode:
+			return a.handleBatchTagEditKeys(key)
 		default:
 			return a.handleEscape()
 		}
@@ -42,6 +46,10 @@ func (a *App) handleKeyPress(key string) tea.Cmd {
 		return a.handleLyricsEditKeys(key)
 	case HelpMode:
 		return a.handleHelpKeys(key)
+	case BatchTagEditMode:
+		return a.handleBatchTagEditKeys(key)
+	case BatchFieldEditMode:
+		return a.handleBatchFieldEditKeys(key)
 	}
 
 	return nil
@@ -58,16 +66,43 @@ func (a *App) handleFileBrowserKeys(key string) tea.Cmd {
 	case "pgdn":
 		a.fileBrowser.PageDown(10)
 	case "enter":
-		if err := a.fileBrowser.Navigate(); err != nil {
-			a.setError("Navigation failed", err.Error())
+		// In batch mode, pressing enter should open batch tag editor (or navigate directories)
+		if a.fileBrowser.IsBatchMode() {
+			if err := a.fileBrowser.Navigate(); err != nil {
+				a.setError("Navigation failed", err.Error())
+			} else {
+				// If it's a file, treat it as a batch selection and open bulk editor
+				if file := a.fileBrowser.GetSelectedFile(); file != nil {
+					// Auto-select the file if not already selected
+					if !a.fileBrowser.IsSelected(file.Path) {
+						a.fileBrowser.ToggleSelection()
+					}
+					// Open bulk tag editor
+					a.currentMode = BatchTagEditMode
+					a.bulkTagEditor.Reset()
+					a.loadCommonTagsForBulk()
+					return a.setStatus("Batch tag editor - edit fields with Enter, save with 's'", 3)
+				}
+			}
 		} else {
-			if file := a.fileBrowser.GetSelectedFile(); file != nil {
-				return a.loadFile(file)
+			// Normal mode - navigate or load file
+			if err := a.fileBrowser.Navigate(); err != nil {
+				a.setError("Navigation failed", err.Error())
+			} else {
+				if file := a.fileBrowser.GetSelectedFile(); file != nil {
+					return a.loadFile(file)
+				}
 			}
 		}
 	case "tab":
-		if a.currentFile != nil {
+		if a.currentFile != nil && !a.fileBrowser.IsBatchMode() {
 			a.currentMode = TagEditMode
+		} else if a.fileBrowser.IsBatchMode() && len(a.fileBrowser.GetSelectedFiles()) > 0 {
+			// Enter batch tag edit mode
+			a.currentMode = BatchTagEditMode
+			a.bulkTagEditor.Reset()
+			a.loadCommonTagsForBulk()
+			return a.setStatus("Batch tag editor - edit fields with Enter, save with 's'", 3)
 		}
 	case "/":
 		a.currentMode = SearchMode
@@ -79,6 +114,10 @@ func (a *App) handleFileBrowserKeys(key string) tea.Cmd {
 		}
 	case "b":
 		a.fileBrowser.ToggleBatchMode()
+		// Clear current file when entering batch mode so single-file tags panel doesn't show
+		if a.fileBrowser.IsBatchMode() {
+			a.currentFile = nil
+		}
 		return a.setStatus("Batch mode: "+map[bool]string{true: "ON", false: "OFF"}[a.fileBrowser.IsBatchMode()], 2)
 	case "h":
 		a.fileBrowser.ToggleHidden()
@@ -258,6 +297,70 @@ func (a *App) handleLyricsEditKeys(key string) tea.Cmd {
 		// text input for lyrics???
 	}
 
+	return nil
+}
+
+func (a *App) handleBatchTagEditKeys(key string) tea.Cmd {
+	switch key {
+	case "up", "k":
+		a.bulkTagEditor.MoveToPreviousField()
+	case "down", "j":
+		a.bulkTagEditor.MoveToNextField()
+	case "tab":
+		a.currentMode = FileBrowserMode
+	case "enter", "e":
+		// Start editing the current field
+		fieldIndex := a.bulkTagEditor.GetEditingField()
+		a.bulkTagEditor.StartEditing(fieldIndex)
+		// Auto-enable the field when starting to edit
+		if !a.bulkTagEditor.IsFieldEnabled(fieldIndex) {
+			a.bulkTagEditor.ToggleFieldEnabled(fieldIndex)
+		}
+		a.currentMode = BatchFieldEditMode
+	case "s", "ctrl+s":
+		// Save/Apply bulk tags
+		return a.applyBulkTags()
+	case "f", "ctrl+f":
+		// Fetch for all selected files
+		return a.batchFetchBoth()
+	case "ctrl+l":
+		// Fetch lyrics only
+		return a.batchFetchLyrics()
+	case "ctrl+a":
+		// Fetch artwork only
+		return a.batchFetchArtwork()
+	case "esc":
+		a.currentMode = FileBrowserMode
+		a.bulkTagEditor.Reset()
+		return a.setStatus("Exited batch tag editor", 1)
+	}
+
+	return nil
+}
+
+func (a *App) handleBatchFieldEditKeys(key string) tea.Cmd {
+	switch key {
+	case "enter":
+		a.bulkTagEditor.StopEditing()
+		a.currentMode = BatchTagEditMode
+	case "esc":
+		a.bulkTagEditor.CancelEditing()
+		a.currentMode = BatchTagEditMode
+	default:
+		buffer := a.bulkTagEditor.GetEditBuffer()
+		switch key {
+		case "backspace":
+			if len(buffer) > 0 {
+				a.bulkTagEditor.UpdateEditBuffer(buffer[:len(buffer)-1])
+			}
+		case "ctrl+u":
+			a.bulkTagEditor.UpdateEditBuffer("")
+		default:
+			if len(key) == 1 {
+				a.bulkTagEditor.UpdateEditBuffer(buffer + key)
+			}
+		}
+	}
 	return nil
 }
 
