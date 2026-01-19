@@ -18,7 +18,7 @@ Edit tags, pull lyrics and album art right from your terminal. Supports image re
 ## Core Features
 
 **Modern TUI** – Bubble Tea + Kitty protocol artwork rendering  
-**Batch Processing** – Fast batch processing using goroutines  
+**Batch Processing** – Fast batch processing using goroutines with bulk tag editing  
 **Smart Fetching** – Auto-grab lyrics & artwork using mp3 metadata
 
 ---

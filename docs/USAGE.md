@@ -20,7 +20,49 @@ tagTonic tui
 | `?` | Show help |
 | `q` | Quit |
 
-**Features:** File browser, tag editor, artwork preview (Kitty protocol), lyrics viewer, batch operations.
+**Features:** File browser, tag editor, artwork preview (Kitty protocol), lyrics viewer, batch operations, bulk tag editing.
+
+### Bulk Tag Editor (Batch Mode)
+
+Edit tags across multiple files at once with selective field updates.
+
+**Entering Batch Mode:**
+
+1. Press `b` to enable batch mode
+2. Use `Space` to select/deselect files
+3. Press `Tab` or `Enter` to open the bulk tag editor
+
+**In the Bulk Tag Editor:**
+
+| Key | Action |
+|-----|--------|
+| `↑/↓` or `j/k` | Navigate fields |
+| `Enter` or `e` | Edit field value |
+| `s` or `Ctrl+S` | Save/apply tags to all selected files |
+| `f` or `Ctrl+F` | Fetch lyrics and artwork for all |
+| `Ctrl+L` | Fetch lyrics only |
+| `Ctrl+A` | Fetch artwork only |
+| `Tab` | Switch to file browser |
+| `Esc` | Exit bulk tag editor |
+
+**How it works:**
+
+- Fields display common values if all selected files share the same value
+- Fields show `<multiple values>` if values differ across files
+- Only fields marked with `[✓]` (enabled and modified) are applied
+- Unchanged fields preserve their individual values in each file
+- Supported fields: Title, Artist, Album, Year, Genre (Lyrics not supported in bulk edit)
+
+**Example workflow:**
+
+```bash
+# In the TUI:
+# 1. Press 'b' to enter batch mode
+# 2. Navigate and press Space to select multiple MP3s
+# 3. Press Tab to open bulk tag editor
+# 4. Edit the "Album" or "Artist" field (sets same value for all)
+# 5. Press 's' to save - only modified fields are updated
+```
 
 ---
 
