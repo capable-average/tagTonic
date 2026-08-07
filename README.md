@@ -103,5 +103,5 @@ make lint     # Code quality checks
 
 ## License
 
-MIT © [sk-pathak](https://github.com/sk-pathak)
+MIT © [capable-average](https://github.com/capable-average)
 </div>
